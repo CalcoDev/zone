@@ -10,4 +10,5 @@ pub const playerSpeed: f32 = 0.5;
 
 pub const introText = "ZONE";
 pub const introFontSize = 20;
-pub const introDuration = gameFps * 2;
+// pub const introDuration = gameFps * 2;
+pub const introDuration = 0;

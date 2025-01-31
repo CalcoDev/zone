@@ -12,12 +12,27 @@ const rect2i = calc.rect2i;
 
 const _state = @import("state.zig");
 const Trigger = _state.Trigger;
+const TextureType = _state.TextureType;
 const state = &_state.state;
+const arena = &_state.arena;
 
-fn gameInit() void {
+const entities = @import("entities.zig");
+
+fn gameInit() !void {
     state.input.enabled = false;
     state.game_mode = .Intro;
     state.intro.start = Trigger.now();
+
+    for (&state.textures) |*texture| {
+        texture.texture = try rl.loadTexture(texture.path);
+    }
+
+    try gameInitGameplayScene();
+}
+
+fn gameInitGameplayScene() !void {
+    const player = entities.Entity.make_player();
+    try state.game.entities.append(player);
 }
 
 fn gameTick() void {
@@ -27,6 +42,22 @@ fn gameTick() void {
             state.game_mode = .Game;
             state.input.enabled = true;
         }
+    } else {
+        for (state.game.entities.items) |*entity| {
+            gameTickEntity(entity);
+        }
+    }
+}
+
+fn gameTickEntity(e: *entities.Entity) void {
+    switch (e.e_type) {
+        .default => {},
+        .player => {
+            const v = state.input.movement.to_f32().normalize().scale(k.playerSpeed);
+            e.position = e.position.add(v);
+
+            state.game.camera.target = @bitCast(e.position);
+        },
     }
 }
 
@@ -46,9 +77,52 @@ fn gameDraw() !void {
         const alpha = 1.0 - @as(f32, @floatFromInt(ticks)) / @as(f32, @floatFromInt(k.introDuration));
         rl.drawTextEx(font, k.introText, @bitCast(centeredPos), k.introFontSize, 2.0, rl.colorAlpha(rl.Color.white, alpha));
     } else if (state.game_mode == .Game) {
-        // const pos = rect2f.center_pos()
+        rl.beginMode2D(state.game.camera);
+
         rl.drawText("game mode", 20, 20, 20, rl.Color.white);
+
+        for (state.game.entities.items) |entity| {
+            gameDrawEntity(entity);
+        }
+
+        rl.endMode2D();
     }
+}
+
+fn gameDrawEntity(e: entities.Entity) void {
+    switch (e.e_type) {
+        .default => {},
+        .player => {
+            rl.drawTexture(
+                state.textures[@intFromEnum(TextureType.Player)].texture,
+                @intFromFloat(e.position.x),
+                @intFromFloat(e.position.y),
+                rl.Color.white,
+            );
+        },
+    }
+}
+
+fn gameUninit() void {
+    for (state.textures) |texture| {
+        rl.unloadTexture(texture.texture);
+    }
+
+    state.game.entities.deinit();
+    arena.deinit();
+}
+
+fn getKeyStateFromRaylib(key: rl.KeyboardKey) _state.KeyState {
+    if (rl.isKeyPressed(key)) {
+        return _state.KeyState.Pressed;
+    } else if (rl.isKeyReleased(key)) {
+        return _state.KeyState.Released;
+    } else if (rl.isKeyDown(key)) {
+        return _state.KeyState.Down;
+    } else if (rl.isKeyUp(key)) {
+        return _state.KeyState.Up;
+    }
+    unreachable;
 }
 
 pub fn main() !void {
@@ -60,10 +134,20 @@ pub fn main() !void {
     defer rl.unloadRenderTexture(gameTex);
 
     state.time.tick = 0;
-    gameInit();
+    try gameInit();
+    defer gameUninit();
+
+    rl.setExitKey(rl.KeyboardKey.null);
 
     while (!rl.windowShouldClose()) {
         state.time.tick += 1;
+        if (state.input.enabled) {
+            state.input.movement = v2i.init(
+                @as(i32, @intFromBool(rl.isKeyDown(rl.KeyboardKey.d))) - @as(i32, @intFromBool(rl.isKeyDown(rl.KeyboardKey.a))),
+                @as(i32, @intFromBool(rl.isKeyDown(rl.KeyboardKey.s))) - @as(i32, @intFromBool(rl.isKeyDown(rl.KeyboardKey.w))),
+            );
+            state.input.pause = getKeyStateFromRaylib(rl.KeyboardKey.escape);
+        }
         gameTick();
 
         rl.beginTextureMode(gameTex);

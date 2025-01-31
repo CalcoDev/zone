@@ -19,7 +19,7 @@ pub const v2i = packed struct {
     }
 
     pub fn to_f32(a: v2i) v2f {
-        return v2f{ @floatFromInt(a.x), @floatFromInt(a.y) };
+        return v2f{ .x = @floatFromInt(a.x), .y = @floatFromInt(a.y) };
     }
 };
 
@@ -39,8 +39,29 @@ pub const v2f = packed struct {
         return .{ .x = a.x * b.x, .y = a.y * b.y };
     }
 
+    pub fn div(a: v2f, b: v2f) v2f {
+        return .{ .x = a.x / b.x, .y = a.y / b.y };
+    }
+
     pub fn scale(a: v2f, b: f32) v2f {
         return .{ .x = a.x * b, .y = a.y * b };
+    }
+
+    pub fn sqrLen(v: v2f) f32 {
+        return v.x * v.x + v.y * v.y;
+    }
+
+    pub fn len(v: v2f) f32 {
+        return @sqrt(v.sqrLen());
+    }
+
+    pub fn normalize(v: v2f) v2f {
+        const llen = v.len();
+        if (llen != 0.0) {
+            return v.scale(1.0 / llen);
+        } else {
+            return v2f.init(0, 0);
+        }
     }
 
     pub fn to_i32(a: v2f) v2i {

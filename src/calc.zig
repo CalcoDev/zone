@@ -64,6 +64,10 @@ pub const v2f = packed struct {
         }
     }
 
+    pub fn init_angle(angle: f32) v2f {
+        return v2f.init(@cos(angle), @sin(angle));
+    }
+
     pub fn to_i32(a: v2f) v2i {
         return v2f{ @intFromFloat(a.x), @intFromFloat(a.y) };
     }

@@ -58,6 +58,7 @@ fn gameTickEntity(e: *entities.Entity) void {
 
             state.game.camera.target = @bitCast(e.position);
         },
+        .plant => {},
     }
 }
 
@@ -100,6 +101,7 @@ fn gameDrawEntity(e: entities.Entity) void {
                 rl.Color.white,
             );
         },
+        .plant => {},
     }
 }
 
@@ -123,6 +125,82 @@ fn getKeyStateFromRaylib(key: rl.KeyboardKey) _state.KeyState {
         return _state.KeyState.Up;
     }
     unreachable;
+}
+
+// const lSys = "0";
+// const lSys = "11[1[0]0]1[0]0";
+var lSys: []const u8 = "0";
+const lLen: f32 = 10.0 * 1.0;
+
+fn stepLSystem(system: []const u8) ![]const u8 {
+    var str = std.ArrayList(u8).init(std.heap.page_allocator);
+    defer str.deinit();
+    // var i: usize = 0;
+    // while (system[i] != 0) {
+    for (system) |c| {
+        try switch (c) {
+            '1' => {
+                try str.appendSlice("11");
+            },
+            '0' => {
+                try str.appendSlice("1[0]0");
+            },
+            else => str.append(c),
+        };
+
+        // i += 1;
+    }
+    return str.toOwnedSlice();
+}
+
+fn drawLSystem(system: []const u8, pos: v2f, angle: f32) !void {
+    var stack = std.ArrayList(struct { pos: v2f, angle: f32 }).init(arena.allocator());
+    defer stack.deinit();
+
+    var ppos = pos;
+    var pangle = angle;
+
+    try stack.append(.{ .pos = pos, .angle = angle });
+    // var i: usize = 0;
+    // while (system[i] != 0) {
+    for (system) |c| {
+        switch (c) {
+            '0' => {
+                const np = ppos.add(v2f.init_angle(pangle).scale(lLen));
+                rl.drawLine(
+                    @intFromFloat(ppos.x),
+                    @intFromFloat(ppos.y),
+                    @intFromFloat(np.x),
+                    @intFromFloat(np.y),
+                    rl.Color.red,
+                    // ([_]rl.Color{ rl.Color.red, rl.Color.green, rl.Color.yellow })[@intCast(@mod(i, 3))],
+                );
+                ppos = np;
+            },
+            '1' => {
+                const np = ppos.add(v2f.init_angle(pangle).scale(lLen));
+                rl.drawLine(
+                    @intFromFloat(ppos.x),
+                    @intFromFloat(ppos.y),
+                    @intFromFloat(np.x),
+                    @intFromFloat(np.y),
+                    rl.Color.red,
+                    // ([_]rl.Color{ rl.Color.red, rl.Color.green, rl.Color.yellow })[@intCast(@mod(i, 3))],
+                );
+                ppos = np;
+            },
+            '[' => {
+                try stack.append(.{ .pos = ppos, .angle = pangle });
+                pangle -= std.math.pi / 4.0;
+            },
+            ']' => {
+                const last = stack.pop();
+                ppos = last.pos;
+                pangle = last.angle + std.math.pi / 4.0;
+            },
+            else => {},
+        }
+    }
 }
 
 pub fn main() !void {
@@ -151,7 +229,16 @@ pub fn main() !void {
         gameTick();
 
         rl.beginTextureMode(gameTex);
-        try gameDraw();
+        // try gameDraw();
+
+        rl.clearBackground(rl.Color.black);
+        if (rl.isMouseButtonPressed(rl.MouseButton.left)) {
+            lSys = try stepLSystem(lSys);
+        }
+        try drawLSystem(lSys, v2f.init(k.gameWidth / 2, k.gameHeight), -std.math.pi / 2.0);
+
+        // rl.drawLine(20, 20, 20, 30, rl.Color.green);
+
         rl.endTextureMode();
 
         // Draw the screen

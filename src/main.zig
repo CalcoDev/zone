@@ -132,7 +132,49 @@ fn getKeyStateFromRaylib(key: rl.KeyboardKey) _state.KeyState {
 var lSys: []const u8 = "0";
 const lLen: f32 = 10.0 * 1.0;
 
+const FractalType = enum {
+    binaryTree,
+    max,
+};
+
+// const FractalStepRules: [@intFromEnum(FractalType)](*fn (u8) []const u8) = {
+//     var rules: [@intFromEnum(FractalType)]*fn (u8) []const u8 = undefined;
+//     rules[@intFromEnum(FractalType.binaryTree)] = binaryTreeRule;
+// };
+
+const fractalStepRules = makeFractalStepRules(.{
+    .{ .idx = FractalType.binaryTree, .func = binaryTreeRule },
+});
+
+const fractalStepRuleFuncRetType = union { slice: []const u8, char: u8 };
+const fractalStepRuleFuncType = *const fn (u8) fractalStepRuleFuncRetType;
+
+fn makeFractalStepRules(comptime pairs: anytype) [@intFromEnum(FractalType.max)]fractalStepRuleFuncType {
+    var entries: [@intFromEnum(FractalType.max)]fractalStepRuleFuncType = undefined;
+    inline for (pairs) |pair| {
+        entries[@intFromEnum(pair.idx)] = pair.func;
+    }
+    return entries;
+}
+
+fn binaryTreeRule(c: u8) fractalStepRuleFuncRetType {
+    switch (c) {
+        '1' => {
+            return .{ .slice = "11" };
+        },
+        '0' => {
+            return .{ .slice = "1[0]0" };
+        },
+        else => {
+            return .{ .char = c };
+        },
+    }
+    unreachable;
+}
+
 fn stepLSystem(system: []const u8) ![]const u8 {
+    std.log.debug("char {any}", .{fractalStepRules[@intFromEnum(FractalType.binaryTree)]('0').slice});
+
     var str = std.ArrayList(u8).init(std.heap.page_allocator);
     defer str.deinit();
     // var i: usize = 0;

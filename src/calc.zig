@@ -71,6 +71,10 @@ pub const v2f = packed struct {
     pub fn to_i32(a: v2f) v2i {
         return v2f{ @intFromFloat(a.x), @intFromFloat(a.y) };
     }
+
+    pub fn round(v: v2f) v2f {
+        return v2f{ .x = @round(v.x), .y = @round(v.y) };
+    }
 };
 
 pub const rect2f = struct {

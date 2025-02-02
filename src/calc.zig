@@ -35,6 +35,10 @@ pub const v2f = packed struct {
         return .{ .x = a.x + b.x, .y = a.y + b.y };
     }
 
+    pub fn sub(a: v2f, b: v2f) v2f {
+        return .{ .x = a.x - b.x, .y = a.y - b.y };
+    }
+
     pub fn mul(a: v2f, b: v2f) v2f {
         return .{ .x = a.x * b.x, .y = a.y * b.y };
     }
@@ -74,6 +78,14 @@ pub const v2f = packed struct {
 
     pub fn round(v: v2f) v2f {
         return v2f{ .x = @round(v.x), .y = @round(v.y) };
+    }
+
+    pub fn sqrDistance(v1: v2f, v2: v2f) f32 {
+        return v2.sub(v1).sqrLen();
+    }
+
+    pub fn distance(v1: v2f, v2: v2f) f32 {
+        return v2.sub(v1).len();
     }
 };
 

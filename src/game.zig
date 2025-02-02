@@ -129,6 +129,8 @@ pub const State = struct {
                 for (self.gameplay_data.entities.items) |*entity| {
                     entity.draw(self);
                 }
+
+                rl.drawRectangle(100, 100, 20, 20, rl.Color.yellow);
             },
         }
 
@@ -144,6 +146,7 @@ pub const State = struct {
         self.game_scene = .game;
         self.gameplay_data.entities.clearAndFree();
         self.gameplay_data.entities.append(entities.makePlayer(calc.v2f{ .x = 0, .y = 0 })) catch unreachable;
+        self.gameplay_data.entities.append(entities.makeLindenmayerPlant(calc.v2f{ .x = 0, .y = 0 }, "0")) catch unreachable;
     }
 };
 

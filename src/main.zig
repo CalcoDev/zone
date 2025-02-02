@@ -59,12 +59,27 @@ pub fn main() !void {
 
     gl.glEnable(gl.GL_PROGRAM_POINT_SIZE);
 
+    var camera = rl.Camera2D{
+        .offset = rl.Vector2{ .x = gameState.winWidth / 2, .y = gameState.winHeight / 2 },
+        .target = rl.Vector2{ .x = 0, .y = 0 },
+        .rotation = 0.0,
+        .zoom = 1.0,
+    };
+
     while (!rl.WindowShouldClose()) {
+        const movement = calc.v2i.init(
+            @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_D))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_A))),
+            @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_S))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_W))),
+        );
+        const vel = movement.to_f32().normalize().scale(gameState.playerSpeed * 4.0);
+        camera.target = @bitCast(@as(calc.v2f, @bitCast(camera.target)).add(vel));
+
         rl.BeginDrawing();
         rl.ClearBackground(rl.BLACK);
 
         rl.DrawText(rl.TextFormat("%zu particles in one vertex buffer", @as(i32, maxParticles)), 20, 20, 10, rl.RAYWHITE);
 
+        rl.BeginMode2D(camera);
         rl.rlDrawRenderBatchActive();
 
         rl.rlEnableShader(shader.id);
@@ -84,6 +99,7 @@ pub fn main() !void {
         rl.rlDisableVertexArray();
 
         rl.rlDisableShader();
+        rl.EndMode2D();
 
         rl.DrawFPS(20, gameState.winHeight - 20);
 

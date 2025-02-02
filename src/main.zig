@@ -11,15 +11,20 @@ var game: gameState.State = undefined;
 pub fn main() !void {
     rl.initWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.setTargetFPS(gameState.gameFps);
-    rl.setExitKey(rl.KeyboardKey.null);
+    // rl.setExitKey(rl.KeyboardKey.null);
 
-    game = try gameState.State.init();
-    game.sceneIntro();
+    // const shader = rl.loadShader("res/shaders/default.vert", "res/shaders/default.frag") catch unreachable;
+
+    // game = try gameState.State.init();
+    // game.sceneIntro();
     while (!rl.windowShouldClose()) {
-        try game.tick();
-        try game.draw();
+        rl.beginDrawing();
+        rl.clearBackground(rl.Color.black);
+        rl.endDrawing();
+        // try game.tick();
+        // try game.draw();
     }
-    game.deinit();
+    // game.deinit();
 
     rl.closeWindow();
 }

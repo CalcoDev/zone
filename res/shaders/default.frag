@@ -1,31 +1,18 @@
 #version 330
 
-out vec4 finalColor;
-
-// Input vertex attributes (from vertex shader)
-// in vec2 fragTexCoord;
-// in vec4 fragColor;
-
 // Input uniform values
-// uniform sampler2D texture0;
-// uniform vec4 colDiffuse;
+uniform vec4 color;
 
 // Output fragment color
-// out vec4 finalColor;
+out vec4 finalColor;
 
 // NOTE: Add here your custom variables
 
 void main()
 {
-    finalColor = vec4(1.0, 0.0, 0.0, 1.0);
-
-    // Texel color fetching from texture sampler
-    // vec4 texelColor = texture(texture0, fragTexCoord);
-
-    // NOTE: Implement here your fragment shader code
-
-    // final color is the color from the texture 
-    //    times the tint color (colDiffuse)
-    //    times the fragment color (interpolated vertex color)
-    // finalColor = texelColor*colDiffuse*fragColor;
+    // Each point is drawn as a screen space square of gl_PointSize size. gl_PointCoord contains where we are inside of
+    // it. (0, 0) is the top left, (1, 1) the bottom right corner.
+    // Draw each point as a colored circle with alpha 1.0 in the center and 0.0 at the outer edges.
+    // finalColor = vec4(color.rgb, color.a * (1 - length(gl_PointCoord.xy - vec2(0.5))*2));
+    finalColor = vec4(color.rgb, 1);
 }

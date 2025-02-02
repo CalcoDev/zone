@@ -13,6 +13,21 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
+    exe.addIncludePath(b.path("third_party/glad/include"));
+    // const glad = b.addStaticLibrary(.{
+    //     .name = "glad",
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // glad.addCSourceFile(.{
+    //     .file = b.path("third_party/glad/src/glad.c"),
+    //     .flags = &.{"-std=c11"},
+    // });
+    // glad.addIncludePath(b.path("third_party/glad/include"));
+    // glad.linkLibC();
+
+    // exe.linkLibrary(glad);
+
     const raylib_dep = b.dependency("raylib", .{
         .target = target,
         .optimize = optimize,

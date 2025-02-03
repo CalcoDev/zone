@@ -22,12 +22,14 @@ pub fn main() !void {
 
     const shader = rl.LoadShader("res/shaders/rect/rect.vert", "res/shaders/rect/rect.frag");
 
-    const instanceCount = 10;
-    var positions: [instanceCount]rl.Vector3 = undefined;
+    // const positions_loc = rl.GetShaderLocation(shader, "positions");
+
+    const instanceCount = 100;
+    var positions: [instanceCount]calc.v2f = undefined;
     for (0..instanceCount) |i| {
-        positions[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winWidth - 200)));
-        positions[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winHeight - 200)));
-        positions[i].z = 1.0;
+        positions[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winWidth - 200) - gameState.winWidth));
+        positions[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winHeight - 200) - gameState.winHeight));
+        // positions[i].z = @as(f32, @floatFromInt(rl.GetRandomValue(-100, 100)));
     }
 
     var points = [_]f32{
@@ -43,9 +45,8 @@ pub fn main() !void {
     const vao = rl.rlLoadVertexArray();
     _ = rl.rlEnableVertexArray(vao);
     const vbo = rl.rlLoadVertexBuffer(&points, points.len * @sizeOf(f32), false);
-    // Note: LoadShader() automatically fetches the attribute index of "vertexPosition" and saves it in shader.locs[SHADER_LOC_VERTEX_POSITION]
-    rl.rlEnableVertexBuffer(vbo);
 
+    rl.rlEnableVertexBuffer(vbo);
     rl.rlSetVertexAttribute(0, 4, rl.RL_FLOAT, false, 8 * @sizeOf(f32), 0);
     rl.rlEnableVertexAttribute(0);
     rl.rlSetVertexAttribute(1, 4, rl.RL_FLOAT, false, 8 * @sizeOf(f32), 4 * @sizeOf(f32));
@@ -88,8 +89,12 @@ pub fn main() !void {
         const model_view_projection = rl.MatrixMultiply(rl.rlGetMatrixModelview(), rl.rlGetMatrixProjection());
         rl.rlSetUniformMatrix(shader.locs[rl.SHADER_LOC_MATRIX_MVP], model_view_projection);
 
+        // rl.rlSetUniform(positions_loc, &positions, rl.SHADER_UNIFORM_FLOAT, instanceCount);
+        // gl.glUniform3fv(positions_loc, instanceCount, &positions[0].x);
+
         _ = rl.rlEnableVertexArray(vao);
         gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6);
+        // gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
         rl.rlDisableVertexArray();
 
         rl.rlDisableShader();

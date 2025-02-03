@@ -16,54 +16,50 @@ const entities = @import("entities.zig");
 
 var game: gameState.State = undefined;
 
-const Particle = packed struct {
-    x: f32,
-    y: f32,
-    period: f32,
-    padding: f32,
-};
-
-const maxParticles = 10000;
-
 pub fn main() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
 
-    const shader = rl.LoadShader("res/shaders/default.vert", "res/shaders/default.frag");
+    const shader = rl.LoadShader("res/shaders/rect/rect.vert", "res/shaders/rect/rect.frag");
 
-    const current_time_loc = rl.GetShaderLocation(shader, "currentTime");
-    const color_loc = rl.GetShaderLocation(shader, "color");
-
-    std.debug.print("Size of Particle: {}\n", .{@sizeOf(Particle)});
-    std.debug.print("Align of Particle: {}\n", .{@alignOf(Particle)});
-
-    var particles: [maxParticles]Particle = undefined;
-    for (0..maxParticles) |i| {
-        particles[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winWidth - 200)));
-        particles[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winHeight - 200)));
-        // particles[i].x = @floatFromInt(gameState.winWidth / 2);
-        // particles[i].y = @floatFromInt(gameState.winHeight / 2);
-        particles[i].period = @as(f32, @floatFromInt(rl.GetRandomValue(10, 30))) * 10.0;
-        particles[i].padding = 0.0;
+    const instanceCount = 10;
+    var positions: [instanceCount]rl.Vector3 = undefined;
+    for (0..instanceCount) |i| {
+        positions[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winWidth - 200)));
+        positions[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winHeight - 200)));
+        positions[i].z = 1.0;
     }
-    // std.log.debug("particles: {any}", .{particles});
+
+    var points = [_]f32{
+        0.0,  50.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
+        50.0, 50.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+        0.0,  0.0,  0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+
+        0.0,  0.0,  0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+        50.0, 50.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
+        50.0, 0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+    };
 
     const vao = rl.rlLoadVertexArray();
     _ = rl.rlEnableVertexArray(vao);
-    const vbo = rl.rlLoadVertexBuffer(&particles[0], maxParticles * 4 * @sizeOf(f32), false);
+    const vbo = rl.rlLoadVertexBuffer(&points, points.len * @sizeOf(f32), false);
     // Note: LoadShader() automatically fetches the attribute index of "vertexPosition" and saves it in shader.locs[SHADER_LOC_VERTEX_POSITION]
-    rl.rlSetVertexAttribute(@intCast(shader.locs[rl.SHADER_LOC_VERTEX_POSITION]), 4, rl.RL_FLOAT, false, 4 * @sizeOf(f32), 0);
+    rl.rlEnableVertexBuffer(vbo);
+
+    rl.rlSetVertexAttribute(0, 4, rl.RL_FLOAT, false, 8 * @sizeOf(f32), 0);
     rl.rlEnableVertexAttribute(0);
+    rl.rlSetVertexAttribute(1, 4, rl.RL_FLOAT, false, 8 * @sizeOf(f32), 4 * @sizeOf(f32));
+    rl.rlEnableVertexAttribute(1);
+
     rl.rlDisableVertexBuffer();
     rl.rlDisableVertexArray();
 
-    gl.glEnable(gl.GL_PROGRAM_POINT_SIZE);
-
-    var camera = rl.Camera2D{
-        .offset = rl.Vector2{ .x = gameState.winWidth / 2, .y = gameState.winHeight / 2 },
-        .target = rl.Vector2{ .x = 0, .y = 0 },
-        .rotation = 0.0,
-        .zoom = 1.0,
+    var camera = rl.Camera3D{
+        .projection = rl.CAMERA_ORTHOGRAPHIC,
+        .fovy = 1280.0 / 2.0,
+        .position = rl.Vector3{ .x = 0.0, .y = 0.0, .z = -10.0 },
+        .target = rl.Vector3{ .x = 0.0, .y = 0.0, .z = 0.0 },
+        .up = rl.Vector3{ .x = 0.0, .y = -1.0, .z = 0.0 },
     };
 
     while (!rl.WindowShouldClose()) {
@@ -72,34 +68,32 @@ pub fn main() !void {
             @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_S))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_W))),
         );
         const vel = movement.to_f32().normalize().scale(gameState.playerSpeed * 4.0);
-        camera.target = @bitCast(@as(calc.v2f, @bitCast(camera.target)).add(vel));
+        camera.position.x = camera.position.x + vel.x;
+        camera.position.y = camera.position.y + vel.y;
+        camera.target.x = camera.position.x;
+        camera.target.y = camera.position.y;
+        rl.UpdateCamera(&camera, rl.CAMERA_FREE);
 
         rl.BeginDrawing();
         rl.ClearBackground(rl.BLACK);
 
-        rl.DrawText(rl.TextFormat("%zu particles in one vertex buffer", @as(i32, maxParticles)), 20, 20, 10, rl.RAYWHITE);
+        rl.BeginMode3D(camera);
 
-        rl.BeginMode2D(camera);
+        // rl.DrawRectangle(0, 0, 100, 100, rl.YELLOW);
+
         rl.rlDrawRenderBatchActive();
 
         rl.rlEnableShader(shader.id);
-
-        const time: f32 = @floatCast(rl.GetTime());
-        rl.rlSetUniform(current_time_loc, &time, rl.RL_SHADER_UNIFORM_FLOAT, 1);
-
-        const color = rl.ColorNormalize(rl.Color{ .r = 0, .g = 255, .b = 0, .a = 128 });
-        rl.rlSetUniform(color_loc, &color.x, rl.RL_SHADER_UNIFORM_VEC4, 1);
 
         const model_view_projection = rl.MatrixMultiply(rl.rlGetMatrixModelview(), rl.rlGetMatrixProjection());
         rl.rlSetUniformMatrix(shader.locs[rl.SHADER_LOC_MATRIX_MVP], model_view_projection);
 
         _ = rl.rlEnableVertexArray(vao);
-        // rl.rlDrawVertexArray()
-        gl.glDrawArrays(gl.GL_POINTS, 0, maxParticles);
+        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6);
         rl.rlDisableVertexArray();
 
         rl.rlDisableShader();
-        rl.EndMode2D();
+        rl.EndMode3D();
 
         rl.DrawFPS(20, gameState.winHeight - 20);
 

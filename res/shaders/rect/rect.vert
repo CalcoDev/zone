@@ -4,7 +4,11 @@ layout(location = 0) in vec4 vertexPosition;
 layout(location = 1) in vec4 vertexColor;
 
 layout(location = 0) uniform mat4 mvp;
-layout(location = 1) uniform vec3 positions[100];
+// layout(location = 1) uniform vec3 positions[100];
+
+layout(binding = 0, std430) buffer PositionsBuffer {
+    vec3 positions[1];
+};
 
 out vec4 fragColor;
 

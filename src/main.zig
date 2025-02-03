@@ -40,6 +40,8 @@ pub fn main() !void {
         50.0, 0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
     };
 
+    const ssbo = rl.rlLoadShaderBuffer(positions.len * @sizeOf(rl.Vector3), &positions, rl.RL_DYNAMIC_COPY);
+
     const vao = rl.rlLoadVertexArray();
     _ = rl.rlEnableVertexArray(vao);
     const vbo = rl.rlLoadVertexBuffer(&points, points.len * @sizeOf(f32), false);
@@ -81,13 +83,14 @@ pub fn main() !void {
 
         rl.rlEnableShader(shader.id);
 
+        rl.rlBindShaderBuffer(ssbo, 0);
+
         const model_view_projection = rl.MatrixMultiply(rl.rlGetMatrixModelview(), rl.rlGetMatrixProjection());
         rl.rlSetUniformMatrix(0, model_view_projection);
 
         gl.glUniform3fv(1, @as(gl.GLsizei, instanceCount), @ptrCast(&positions));
 
         _ = rl.rlEnableVertexArray(vao);
-        // gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6);
         gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
         rl.rlDisableVertexArray();
 
@@ -98,6 +101,8 @@ pub fn main() !void {
 
         rl.EndDrawing();
     }
+
+    rl.rlUnloadShaderBuffer(ssbo);
 
     rl.rlUnloadVertexArray(vao);
     rl.rlUnloadVertexBuffer(vbo);

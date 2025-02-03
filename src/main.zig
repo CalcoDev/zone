@@ -22,14 +22,12 @@ pub fn main() !void {
 
     const shader = rl.LoadShader("res/shaders/rect/rect.vert", "res/shaders/rect/rect.frag");
 
-    // const positions_loc = rl.GetShaderLocation(shader, "positions");
-
     const instanceCount = 100;
-    var positions: [instanceCount]calc.v2f = undefined;
+    var positions: [instanceCount]rl.Vector3 = undefined;
     for (0..instanceCount) |i| {
-        positions[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winWidth - 200) - gameState.winWidth));
-        positions[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(200, gameState.winHeight - 200) - gameState.winHeight));
-        // positions[i].z = @as(f32, @floatFromInt(rl.GetRandomValue(-100, 100)));
+        positions[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(0, gameState.winWidth) - gameState.winWidth / 2));
+        positions[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(0, gameState.winHeight) - gameState.winHeight / 2));
+        positions[i].z = 100.0;
     }
 
     var points = [_]f32{
@@ -73,28 +71,24 @@ pub fn main() !void {
         camera.position.y = camera.position.y + vel.y;
         camera.target.x = camera.position.x;
         camera.target.y = camera.position.y;
-        rl.UpdateCamera(&camera, rl.CAMERA_FREE);
 
         rl.BeginDrawing();
         rl.ClearBackground(rl.BLACK);
 
         rl.BeginMode3D(camera);
 
-        // rl.DrawRectangle(0, 0, 100, 100, rl.YELLOW);
-
         rl.rlDrawRenderBatchActive();
 
         rl.rlEnableShader(shader.id);
 
         const model_view_projection = rl.MatrixMultiply(rl.rlGetMatrixModelview(), rl.rlGetMatrixProjection());
-        rl.rlSetUniformMatrix(shader.locs[rl.SHADER_LOC_MATRIX_MVP], model_view_projection);
+        rl.rlSetUniformMatrix(0, model_view_projection);
 
-        // rl.rlSetUniform(positions_loc, &positions, rl.SHADER_UNIFORM_FLOAT, instanceCount);
-        // gl.glUniform3fv(positions_loc, instanceCount, &positions[0].x);
+        gl.glUniform3fv(1, @as(gl.GLsizei, instanceCount), @ptrCast(&positions));
 
         _ = rl.rlEnableVertexArray(vao);
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6);
-        // gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
+        // gl.glDrawArrays(gl.GL_TRIANGLES, 0, 6);
+        gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
         rl.rlDisableVertexArray();
 
         rl.rlDisableShader();

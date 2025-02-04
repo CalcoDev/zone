@@ -16,7 +16,7 @@ const entities = @import("entities.zig");
 
 var game: gameState.State = undefined;
 
-pub fn main() !void {
+pub fn gameMain() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
 
@@ -36,14 +36,16 @@ pub fn main() !void {
     }
 
     var points = [_]f32{
-        0.0,  50.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0,
-        50.0, 50.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
-        0.0,  0.0,  0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
+        0.0,  50.0, 0.0, 0.0, 1.0,
+        50.0, 50.0, 0.0, 1.0, 1.0,
+        0.0,  0.0,  0.0, 0.0, 0.0,
 
-        0.0,  0.0,  0.0, 1.0, 0.0, 0.0, 1.0, 1.0,
-        50.0, 50.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0,
-        50.0, 0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
+        0.0,  0.0,  0.0, 0.0, 0.0,
+        50.0, 50.0, 0.0, 1.0, 1.0,
+        50.0, 0.0,  0.0, 1.0, 0.0,
     };
+
+    const tex = rl.LoadTexture("res/particle.png");
 
     const compute_data = rl.LoadFileText("res/shaders/rect/sim.glsl");
     const compute_shader = rl.rlCompileShader(compute_data, rl.RL_COMPUTE_SHADER);
@@ -58,9 +60,10 @@ pub fn main() !void {
     const vbo = rl.rlLoadVertexBuffer(&points, points.len * @sizeOf(f32), false);
 
     rl.rlEnableVertexBuffer(vbo);
-    rl.rlSetVertexAttribute(0, 4, rl.RL_FLOAT, false, 8 * @sizeOf(f32), 0);
+    const stride = 5 * @sizeOf(f32);
+    rl.rlSetVertexAttribute(0, 3, rl.RL_FLOAT, false, stride, 0);
     rl.rlEnableVertexAttribute(0);
-    rl.rlSetVertexAttribute(1, 4, rl.RL_FLOAT, false, 8 * @sizeOf(f32), 4 * @sizeOf(f32));
+    rl.rlSetVertexAttribute(1, 3, rl.RL_FLOAT, false, stride, 3 * @sizeOf(f32));
     rl.rlEnableVertexAttribute(1);
 
     rl.rlDisableVertexBuffer();
@@ -106,7 +109,15 @@ pub fn main() !void {
         rl.rlSetUniformMatrix(0, model_view_projection);
         // gl.glUniform3fv(1, @as(gl.GLsizei, instanceCount), @ptrCast(&positions));
 
+        rl.rlEnableTexture(tex.id);
+
         _ = rl.rlEnableVertexArray(vao);
+
+        gl.glEnable(gl.GL_BLEND);
+        gl.glEnable(gl.GL_DEPTH_TEST);
+        gl.glDepthMask(gl.GL_FALSE);
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA);
+
         gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
         rl.rlDisableVertexArray();
 
@@ -118,6 +129,8 @@ pub fn main() !void {
         rl.EndDrawing();
     }
 
+    rl.UnloadTexture(tex);
+
     rl.rlUnloadShaderProgram(compute);
 
     rl.rlUnloadShaderBuffer(pos_ssbo);
@@ -127,4 +140,8 @@ pub fn main() !void {
     rl.rlUnloadVertexBuffer(vbo);
 
     rl.CloseWindow();
+}
+
+pub fn main() !void {
+    try gameMain();
 }

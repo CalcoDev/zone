@@ -142,6 +142,101 @@ pub fn gameMain() !void {
     rl.CloseWindow();
 }
 
+pub fn drawLineDotted(x0: i32, y0: i32, x1: i32, y1: i32, segment_size: i32, color: rl.Color) void {
+    const dx: f32 = @floatFromInt(x1 - x0);
+    const dy: f32 = @floatFromInt(y1 - y0);
+    const length = @sqrt(dx * dx + dy * dy);
+
+    if (length == 0) return; // Avoid division by zero
+
+    const stepX = dx / length * @as(f32, @floatFromInt(segment_size * 2));
+    const stepY = dy / length * @as(f32, @floatFromInt(segment_size * 2));
+
+    var curX: f32 = @floatFromInt(x0);
+    var curY: f32 = @floatFromInt(y0);
+
+    var i: f32 = 0;
+    while (i < length) : (i += @floatFromInt(segment_size * 2)) {
+        const segmSize: f32 = @floatFromInt(segment_size);
+        const nextX: i32 = @intFromFloat(curX + (dx / length * segmSize));
+        const nextY: i32 = @intFromFloat(curY + (dy / length * segmSize));
+
+        rl.DrawLine(
+            @as(i32, @intFromFloat(curX)),
+            @as(i32, @intFromFloat(curY)),
+            nextX,
+            nextY,
+            color,
+        );
+
+        curX += stepX;
+        curY += stepY;
+    }
+}
+pub fn curveEditorMain() !void {
+    rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
+    rl.SetTargetFPS(gameState.gameFps);
+
+    const lineWidth = 2;
+    const lineSpacingX = 50;
+    const lineSpacingY = 50;
+
+    // a / lineSpacingX *
+    const rectSizeX = (gameState.winWidth / 2) / lineSpacingX * lineSpacingX;
+    const rectSizeY = (gameState.winHeight / 2) / lineSpacingY * lineSpacingY;
+
+    const lineCountX = rectSizeX / lineSpacingX;
+    const lineCountY = rectSizeY / lineSpacingY;
+
+    const lineDots = 20;
+    const lineDotsX = rectSizeX / lineDots;
+    const lineDotsY = rectSizeY / lineDots * 16 / 9;
+
+    const camera = rl.Camera2D{
+        .offset = rl.Vector2{
+            .x = gameState.winWidth / 2 - rectSizeX / 2,
+            .y = gameState.winHeight / 2 - rectSizeY / 2,
+        },
+        .target = rl.Vector2{ .x = 0, .y = 0 },
+        .rotation = 0.0,
+        .zoom = 1.0,
+    };
+
+    while (!rl.WindowShouldClose()) {
+        rl.BeginDrawing();
+        rl.ClearBackground(rl.BLACK);
+
+        rl.BeginMode2D(camera);
+        rl.rlSetLineWidth(lineWidth);
+        for (0..lineCountY + 1) |y| {
+            drawLineDotted(
+                0,
+                @intCast(y * lineSpacingY),
+                rectSizeX,
+                @intCast(y * lineSpacingY),
+                lineDotsX,
+                rl.GRAY,
+            );
+        }
+        for (0..lineCountX + 1) |x| {
+            drawLineDotted(
+                @intCast(x * lineSpacingX),
+                0,
+                @intCast(x * lineSpacingX),
+                rectSizeY,
+                lineDotsY,
+                rl.GRAY,
+            );
+        }
+        rl.EndMode2D();
+
+        rl.DrawFPS(20, gameState.winHeight - 20);
+        rl.EndDrawing();
+    }
+
+    rl.CloseWindow();
+}
+
 pub fn main() !void {
-    try gameMain();
+    try curveEditorMain();
 }

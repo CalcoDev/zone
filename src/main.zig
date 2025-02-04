@@ -24,10 +24,15 @@ pub fn main() !void {
 
     const instanceCount = 100;
     var positions: [instanceCount]rl.Vector3 = undefined;
+    var vels: [instanceCount]rl.Vector2 = undefined;
     for (0..instanceCount) |i| {
         positions[i].x = @as(f32, @floatFromInt(rl.GetRandomValue(0, gameState.winWidth) - gameState.winWidth / 2));
         positions[i].y = @as(f32, @floatFromInt(rl.GetRandomValue(0, gameState.winHeight) - gameState.winHeight / 2));
         positions[i].z = 100.0;
+
+        const angle = @as(f32, @floatFromInt(rl.GetRandomValue(0, 314 * 2))) / 100.0;
+        vels[i].x = @cos(angle);
+        vels[i].y = @sin(angle);
     }
 
     var points = [_]f32{
@@ -40,7 +45,13 @@ pub fn main() !void {
         50.0, 0.0,  0.0, 1.0, 0.0, 0.0, 0.0, 1.0,
     };
 
-    const ssbo = rl.rlLoadShaderBuffer(positions.len * @sizeOf(rl.Vector3), &positions, rl.RL_DYNAMIC_COPY);
+    const compute_data = rl.LoadFileText("res/shaders/rect/sim.glsl");
+    const compute_shader = rl.rlCompileShader(compute_data, rl.RL_COMPUTE_SHADER);
+    const compute = rl.rlLoadComputeShaderProgram(compute_shader);
+    rl.UnloadFileText(compute_data);
+
+    const pos_ssbo = rl.rlLoadShaderBuffer(positions.len * @sizeOf(rl.Vector3), &positions, rl.RL_DYNAMIC_COPY);
+    const vel_ssbo = rl.rlLoadShaderBuffer(vels.len * @sizeOf(rl.Vector3), &vels, rl.RL_DYNAMIC_COPY);
 
     const vao = rl.rlLoadVertexArray();
     _ = rl.rlEnableVertexArray(vao);
@@ -81,14 +92,19 @@ pub fn main() !void {
 
         rl.rlDrawRenderBatchActive();
 
+        rl.rlEnableShader(compute);
+        rl.rlBindShaderBuffer(pos_ssbo, 0);
+        rl.rlBindShaderBuffer(vel_ssbo, 1);
+        rl.rlComputeShaderDispatch(3, 1, 1);
+        rl.rlDisableShader();
+
         rl.rlEnableShader(shader.id);
 
-        rl.rlBindShaderBuffer(ssbo, 0);
+        rl.rlBindShaderBuffer(pos_ssbo, 0);
 
         const model_view_projection = rl.MatrixMultiply(rl.rlGetMatrixModelview(), rl.rlGetMatrixProjection());
         rl.rlSetUniformMatrix(0, model_view_projection);
-
-        gl.glUniform3fv(1, @as(gl.GLsizei, instanceCount), @ptrCast(&positions));
+        // gl.glUniform3fv(1, @as(gl.GLsizei, instanceCount), @ptrCast(&positions));
 
         _ = rl.rlEnableVertexArray(vao);
         gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
@@ -102,7 +118,10 @@ pub fn main() !void {
         rl.EndDrawing();
     }
 
-    rl.rlUnloadShaderBuffer(ssbo);
+    rl.rlUnloadShaderProgram(compute);
+
+    rl.rlUnloadShaderBuffer(pos_ssbo);
+    rl.rlUnloadShaderBuffer(vel_ssbo);
 
     rl.rlUnloadVertexArray(vao);
     rl.rlUnloadVertexBuffer(vbo);

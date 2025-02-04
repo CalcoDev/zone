@@ -7,7 +7,7 @@ layout(location = 0) uniform mat4 mvp;
 // layout(location = 1) uniform vec3 positions[100];
 
 layout(binding = 0, std430) buffer PositionsBuffer {
-    vec3 positions[1];
+    vec3 positions[];
 };
 
 out vec4 fragColor;

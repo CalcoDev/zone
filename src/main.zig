@@ -174,6 +174,7 @@ const tangentSquareSize = 10;
 const tangentSquareColor = col(0xffffffff);
 
 const CurvePoint = packed struct {
+    idx: usize,
     x: f32,
     y: f32,
     tan_left: f32,
@@ -186,6 +187,10 @@ const CurvePoint = packed struct {
     pub fn from_v2f(self: *CurvePoint, v: calc.v2f) void {
         self.x = v.x;
         self.y = v.y;
+    }
+
+    pub fn sort(_: void, lhs: CurvePoint, rhs: CurvePoint) bool {
+        return lhs.x < rhs.x;
     }
 };
 
@@ -423,6 +428,7 @@ pub fn curvePointFromTangent(cx: i32, cy: i32, tan: f32, len_mult: f32) CurvePoi
         .y = 1.0 - @as(f32, @floatFromInt((py + half_pp * 2 - sy))) / @as(f32, @floatFromInt(wy)),
         .tan_left = 0,
         .tan_right = 0,
+        .idx = points.items.len,
     };
 }
 
@@ -430,9 +436,9 @@ pub fn curveEditorMain() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
 
-    points.append(.{ .x = 0, .y = 0, .tan_left = 0.0, .tan_right = 1.0 }) catch unreachable;
-    points.append(.{ .x = 0.5, .y = 0.5, .tan_left = 0, .tan_right = 0 }) catch unreachable;
-    points.append(.{ .x = 1, .y = 1, .tan_left = 1.0, .tan_right = 0.0 }) catch unreachable;
+    points.append(.{ .x = 0, .y = 0, .tan_left = 0.0, .tan_right = 1.0, .idx = 0 }) catch unreachable;
+    points.append(.{ .x = 0.5, .y = 0.5, .tan_left = 0, .tan_right = 0, .idx = 1 }) catch unreachable;
+    points.append(.{ .x = 1, .y = 1, .tan_left = 1.0, .tan_right = 0.0, .idx = 2 }) catch unreachable;
 
     var tangent_points: [2]CurvePoint = undefined;
     var set_tangent_points = false;
@@ -449,6 +455,25 @@ pub fn curveEditorMain() !void {
     while (!rl.WindowShouldClose()) {
         rl.BeginDrawing();
         rl.ClearBackground(rl.BLACK);
+
+        for (0..points.items.len - 1) |i| {
+            if (points.items[i].x > points.items[i + 1].x) {
+                std.mem.sort(CurvePoint, points.items, {}, CurvePoint.sort);
+                var didswap = false;
+                for (0..points.items.len) |ii| {
+                    const oldidx = points.items[ii].idx;
+                    points.items[ii].idx = ii;
+                    if (!didswap and oldidx == selected_point) {
+                        didswap = true;
+                        selected_point = @intCast(ii);
+                        if (prev_hovered >= 0) {
+                            prev_hovered = @intCast(ii);
+                        }
+                    }
+                }
+                break;
+            }
+        }
 
         // update state
         const inside = mouseInsideRect();
@@ -483,57 +508,30 @@ pub fn curveEditorMain() !void {
                     const po = points.items[@intCast(selected_point)].to_v2f();
                     const p = &tangent_points[@intCast(selected_tangent_point)];
 
-                    // const init = p.to_v2f().sub(po).len();
                     movePoint(p);
 
-                    {
-                        const cx = sx + @as(i32, @intFromFloat(po.x * wx));
-                        const cy = sy + @as(i32, @intFromFloat(@abs(1.0 - po.y) * wy));
-                        const idk = @as(calc.v2f, @bitCast(rl.GetMousePosition())).sub(calc.v2i.init(cx, cy).to_f32());
-                        p.tan_left = -idk.y / idk.x;
-                    }
-                    {
-                        const real_o = calc.v2i.init(
-                            sx + @as(i32, @intFromFloat(po.x * wx)),
-                            sy + @as(i32, @intFromFloat(@abs(1.0 - po.y) * wy)),
-                        ).to_f32();
-                        const real_p = calc.v2i.init(
-                            sx + @as(i32, @intFromFloat(p.x * wx)),
-                            sy + @as(i32, @intFromFloat(@abs(1.0 - p.y) * wy)),
-                        ).to_f32();
+                    const cx = sx + @as(i32, @intFromFloat(po.x * wx));
+                    const cy = sy + @as(i32, @intFromFloat(@abs(1.0 - po.y) * wy));
+                    const idk = @as(calc.v2f, @bitCast(rl.GetMousePosition())).sub(calc.v2i.init(cx, cy).to_f32());
+                    p.tan_left = -idk.y / idk.x;
 
-                        const new_real_p = real_o.add(real_p.sub(real_o).normalize().mul(calc.v2f.init_double(calc.sign((p.x - po.x) * (@as(f32, @floatFromInt(selected_tangent_point)) - 0.5)))).scale(tangentLength));
+                    const real_o = calc.v2i.init(
+                        sx + @as(i32, @intFromFloat(po.x * wx)),
+                        sy + @as(i32, @intFromFloat(@abs(1.0 - po.y) * wy)),
+                    ).to_f32();
+                    const real_p = calc.v2i.init(
+                        sx + @as(i32, @intFromFloat(p.x * wx)),
+                        sy + @as(i32, @intFromFloat(@abs(1.0 - p.y) * wy)),
+                    ).to_f32();
 
-                        const new_p = calc.v2f.init(
-                            @max(0, @min(1.0, (new_real_p.x - @as(f32, @floatFromInt(sx))) / @as(f32, @floatFromInt(wx)))),
-                            1.0 - @max(0, @min(1.0, (new_real_p.y - @as(f32, @floatFromInt(sy))) / @as(f32, @floatFromInt(wy)))),
-                        );
-                        last_stored_real_pos = new_p;
-                        // p.from_v2f(new_p);
-                        // p.x = new_p.x;
-                        // p.y = new_p.y;
+                    const new_real_p = real_o.add(real_p.sub(real_o).normalize().mul(calc.v2f.init_double(calc.sign((p.x - po.x) * (@as(f32, @floatFromInt(selected_tangent_point)) - 0.5)))).scale(tangentLength));
 
-                        // rl.DrawRectangle(new_real_p.x - 5, new_real_p.y - 5, 10, 10, rl.BEIGE);
-                        {
-                            const cx = sx + @as(i32, @intFromFloat(new_p.x * wx)) - pointSize / 2;
-                            const cy = sy + @as(i32, @intFromFloat((1.0 - new_p.y) * wy)) - pointSize / 2;
-                            rl.DrawRectangle(cx, cy, pointSize, pointSize, rl.YELLOW);
-                        }
-                    }
+                    const new_p = calc.v2f.init(
+                        @max(0, @min(1.0, (new_real_p.x - @as(f32, @floatFromInt(sx))) / @as(f32, @floatFromInt(wx)))),
+                        1.0 - @max(0, @min(1.0, (new_real_p.y - @as(f32, @floatFromInt(sy))) / @as(f32, @floatFromInt(wy)))),
+                    );
+                    last_stored_real_pos = new_p;
                 }
-            }
-
-            {
-                const p = tangent_points[0];
-                const cx = sx + @as(i32, @intFromFloat(p.x * wx)) - pointSize / 2;
-                const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy)) - pointSize / 2;
-                rl.DrawRectangle(cx, cy, pointSize, pointSize, rl.GREEN);
-            }
-            {
-                const p = tangent_points[1];
-                const cx = sx + @as(i32, @intFromFloat(p.x * wx)) - pointSize / 2;
-                const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy)) - pointSize / 2;
-                rl.DrawRectangle(cx, cy, pointSize, pointSize, rl.BLUE);
             }
         }
 
@@ -553,20 +551,32 @@ pub fn curveEditorMain() !void {
 
             movePoint(&points.items[@intCast(selected_point)]);
             clampPoint(&points.items[@intCast(selected_point)]);
+
             was_mouse_down = true;
         } else if (selected_tangent_point < 0 and inside and hovered_point >= 0 and rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_RIGHT)) {
             _ = points.orderedRemove(@intCast(hovered_point));
-        } else if (selected_tangent_point < 0 and inside and hovered_point < 0 and rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_LEFT)) {
+            selected_point = -1;
+            hovered_point = -1;
+        } else if (selected_point < 0 and selected_tangent_point < 0 and inside and hovered_point < 0 and rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_LEFT)) {
             const x_percentage = @max(0, @min(1.0, (rl.GetMousePosition().x - @as(f32, @floatFromInt(sx))) / @as(f32, @floatFromInt(wx))));
             const y_percentage = @max(0, @min(1.0, (rl.GetMousePosition().y - @as(f32, @floatFromInt(sy))) / @as(f32, @floatFromInt(wy))));
+            const idx = getPointInsertIndex(x_percentage);
             const point = CurvePoint{
                 .x = x_percentage,
                 .y = 1.0 - y_percentage,
                 .tan_left = 0,
                 .tan_right = 0,
+                .idx = idx,
             };
-            const idx = getPointInsertIndex(x_percentage);
             points.insert(idx, point) catch unreachable;
+            for (idx + 1..points.items.len) |i| {
+                points.items[i].idx += 1;
+            }
+        }
+
+        if (selected_point >= 0 and selected_tangent_point < 0 and rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_LEFT)) {
+            selected_point = -1;
+            hovered_point = -1;
         }
 
         drawLinesAndLabels();

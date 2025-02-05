@@ -112,7 +112,7 @@ pub const v2f = packed struct {
     }
 };
 
-pub const rect2f = struct {
+pub const rect2f = packed struct {
     pos: v2f = .{},
     size: v2f = .{},
 

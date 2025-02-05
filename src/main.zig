@@ -6,6 +6,10 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
+const rgui = @cImport({
+    @cInclude("raygui.h");
+});
+
 const gl = @cImport({
     @cInclude("glad/glad.h");
 });

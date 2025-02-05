@@ -35,7 +35,7 @@ pub fn gameMain() !void {
         vels[i].y = @sin(angle);
     }
 
-    var points = [_]f32{
+    var ppoint = [_]f32{
         0.0,  50.0, 0.0, 0.0, 1.0,
         50.0, 50.0, 0.0, 1.0, 1.0,
         0.0,  0.0,  0.0, 0.0, 0.0,
@@ -57,7 +57,7 @@ pub fn gameMain() !void {
 
     const vao = rl.rlLoadVertexArray();
     _ = rl.rlEnableVertexArray(vao);
-    const vbo = rl.rlLoadVertexBuffer(&points, points.len * @sizeOf(f32), false);
+    const vbo = rl.rlLoadVertexBuffer(&ppoint, ppoint.len * @sizeOf(f32), false);
 
     rl.rlEnableVertexBuffer(vbo);
     const stride = 5 * @sizeOf(f32);
@@ -142,98 +142,328 @@ pub fn gameMain() !void {
     rl.CloseWindow();
 }
 
-pub fn drawLineDotted(x0: i32, y0: i32, x1: i32, y1: i32, segment_size: i32, color: rl.Color) void {
-    const dx: f32 = @floatFromInt(x1 - x0);
-    const dy: f32 = @floatFromInt(y1 - y0);
-    const length = @sqrt(dx * dx + dy * dy);
+pub fn col(hex: comptime_int) rl.Color {
+    return @bitCast(@as(u32, ((hex & 0xFF000000) >> 24) |
+        ((hex & 0x00FF0000) >> 8) |
+        ((hex & 0x0000FF00) << 8) |
+        ((hex & 0x000000FF) << 24)));
+}
 
-    if (length == 0) return; // Avoid division by zero
+const sx = gameState.winWidth / 4;
+const sy = gameState.winHeight / 4;
+const wx = gameState.winWidth / 2;
+const wy = gameState.winHeight / 2;
 
-    const stepX = dx / length * @as(f32, @floatFromInt(segment_size * 2));
-    const stepY = dy / length * @as(f32, @floatFromInt(segment_size * 2));
+const axisLineColor: rl.Color = col(0x67696b88);
 
-    var curX: f32 = @floatFromInt(x0);
-    var curY: f32 = @floatFromInt(y0);
+const axisLabelColor: rl.Color = col(0xffffffff);
+const axisLabelFontsize = 20;
 
-    var i: f32 = 0;
-    while (i < length) : (i += @floatFromInt(segment_size * 2)) {
-        const segmSize: f32 = @floatFromInt(segment_size);
-        const nextX: i32 = @intFromFloat(curX + (dx / length * segmSize));
-        const nextY: i32 = @intFromFloat(curY + (dy / length * segmSize));
+const pointSize = 10;
+const pointColor = col(0xffffff99);
+const selectedPointColor = col(0xff00ffff);
+const pointHoverOffset = 5;
+const pointHoverColor = col(0xffffffff);
 
-        rl.DrawLine(
-            @as(i32, @intFromFloat(curX)),
-            @as(i32, @intFromFloat(curY)),
-            nextX,
-            nextY,
-            color,
-        );
+const lineColor = col(0xfffffffff);
+const lineSegmentCnt = 50;
 
-        curX += stepX;
-        curY += stepY;
+const tangentLength = 75;
+const tangentColour = col(0xffffffff);
+const tangentSquareSize = 10;
+const tangentSquareColor = col(0xffffffff);
+
+const CurvePoint = packed struct {
+    x: f32,
+    y: f32,
+    tan_left: f32,
+    tan_right: f32,
+
+    pub fn to_v2f(self: *const CurvePoint) calc.v2f {
+        return calc.v2f.init(self.x, self.y);
+    }
+
+    pub fn from_v2f(self: *CurvePoint, v: calc.v2f) void {
+        self.x = v.x;
+        self.y = v.y;
+    }
+};
+
+pub fn drawHermiteCurve(p0: CurvePoint, p1: CurvePoint, segments: u32, color: rl.Color) void {
+    const start_x = p0.x * @as(f32, @floatFromInt(wx)) + @as(f32, @floatFromInt(sx));
+    const start_y = (1.0 - p0.y) * @as(f32, @floatFromInt(wy)) + @as(f32, @floatFromInt(sy));
+    const end_x = p1.x * @as(f32, @floatFromInt(wx)) + @as(f32, @floatFromInt(sx));
+    const end_y = (1.0 - p1.y) * @as(f32, @floatFromInt(wy)) + @as(f32, @floatFromInt(sy));
+    const start_tan_x = p0.tan_left * @as(f32, @floatFromInt(wx));
+    const start_tan_y = p0.tan_right * @as(f32, @floatFromInt(wy));
+    const end_tan_x = p1.tan_left * @as(f32, @floatFromInt(wx));
+    const end_tan_y = p1.tan_right * @as(f32, @floatFromInt(wy));
+    var prev_x = start_x;
+    var prev_y = start_y;
+    for (1..segments + 1) |i| {
+        const t = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(segments));
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const h1 = 2.0 * t3 - 3.0 * t2 + 1.0;
+        const h2 = -2.0 * t3 + 3.0 * t2;
+        const h3 = t3 - 2.0 * t2 + t;
+        const h4 = t3 - t2;
+        const x = h1 * start_x + h2 * end_x + h3 * start_tan_x + h4 * end_tan_x;
+        const y = h1 * start_y + h2 * end_y + h3 * start_tan_y + h4 * end_tan_y;
+        rl.DrawLineV(.{ .x = prev_x, .y = prev_y }, .{ .x = x, .y = y }, color);
+        prev_x = x;
+        prev_y = y;
     }
 }
+
+pub fn mouseInsideRect() bool {
+    const m = @as(calc.v2f, @bitCast(rl.GetMousePosition())).to_i32();
+    return m.x > sx and m.x < sx + wx and m.y > sy and m.y < sy + wy;
+}
+
+pub fn mouseHoveredPoint(list: []const CurvePoint, point_size: i32, look_for: i32) i32 {
+    var found: i32 = -1;
+    for (list, 0..) |p, i| {
+        const c = calc.v2f.init(
+            @as(f32, @floatFromInt(sx)) + p.x * @as(f32, @floatFromInt(wx)),
+            @as(f32, @floatFromInt(sy)) + (1.0 - p.y) * @as(f32, @floatFromInt(wy)),
+        );
+        const pp: calc.v2f = @bitCast(rl.GetMousePosition());
+        const ppp = @as(f32, @floatFromInt(point_size)) / 2.0;
+        const d = @max(@abs(pp.x - c.x) - ppp, @abs(pp.y - c.y) - ppp);
+        if (d <= @as(f32, @floatFromInt(point_size))) {
+            if (look_for < 0 or look_for == @as(i32, @intCast(i))) {
+                return @intCast(i);
+            } else {
+                found = @intCast(i);
+            }
+        }
+    }
+    return found;
+}
+
+const allocator = std.heap.page_allocator;
+var points = std.ArrayList(CurvePoint).init(allocator);
+
+pub fn movePoint(point: *CurvePoint) void {
+    const delta = rl.GetMouseDelta();
+    point.x += delta.x / @as(f32, @floatFromInt(wx));
+    point.y -= delta.y / @as(f32, @floatFromInt(wy));
+}
+
+pub fn clampPoint(point: *CurvePoint) void {
+    point.x = @max(0, @min(1, point.x));
+    point.y = @max(0, @min(1, point.y));
+}
+
+pub fn getPointInsertIndex(x: f32) usize {
+    return for (points.items, 0..) |p, i| {
+        if (p.x > x) {
+            break i;
+        }
+    } else 0;
+}
+
+pub fn drawLinesAndLabels() void {
+    // draw horizontal axis lines
+    rl.DrawLine(sx, sy, sx + wx, sy, axisLineColor);
+    rl.DrawLine(sx, sy + wy / 2, sx + wx, sy + wy / 2, axisLineColor);
+    rl.DrawLine(sx, sy + wy, sx + wx, sy + wy, axisLineColor);
+
+    // draw vertical axis lines
+    rl.DrawLine(sx, sy, sx, sy + wy, axisLineColor);
+    rl.DrawLine(sx + wx / 4 * 1, sy, sx + wx / 4 * 1, sy + wy, axisLineColor);
+    rl.DrawLine(sx + wx / 4 * 2, sy, sx + wx / 4 * 2, sy + wy, axisLineColor);
+    rl.DrawLine(sx + wx / 4 * 3, sy, sx + wx / 4 * 3, sy + wy, axisLineColor);
+    rl.DrawLine(sx + wx, sy, sx + wx, sy + wy, axisLineColor);
+
+    // draw labels
+    rl.DrawText("1", sx, sy - axisLabelFontsize, axisLabelFontsize, axisLabelColor);
+    rl.DrawText("0.5", sx, sy + wy / 2 - axisLabelFontsize, axisLabelFontsize, axisLabelColor);
+    rl.DrawText("0", sx, sy + wy - axisLabelFontsize, axisLabelFontsize, axisLabelColor);
+
+    rl.DrawText("1", sx + wx, sy + wy, axisLabelFontsize, axisLabelColor);
+    rl.DrawText("0.25", sx + wx / 4 * 1, sy + wy, axisLabelFontsize, axisLabelColor);
+    rl.DrawText("0.5", sx + wx / 4 * 2, sy + wy, axisLabelFontsize, axisLabelColor);
+    rl.DrawText("0.75", sx + wx / 4 * 3, sy + wy, axisLabelFontsize, axisLabelColor);
+    rl.DrawText("0", sx, sy + wy, axisLabelFontsize, axisLabelColor);
+}
+
+pub fn drawTangentLine(cx: i32, cy: i32, len_mult: f32, tan: f32, hovered: bool) void {
+    const angle = std.math.atan(tan);
+    const v = calc.v2f.init_angle(angle).scale(tangentLength * len_mult).to_i32();
+    rl.DrawLine(cx, cy, cx + v.x, cy + v.y, tangentColour);
+
+    const half_pp = tangentSquareSize / 2;
+    const px: i32 = cx + v.x - half_pp;
+    const py: i32 = cy + v.y - half_pp;
+    const color = if (!hovered) tangentColour else rl.RED;
+    rl.DrawRectangleLines(px, py, tangentSquareSize, tangentSquareSize, color);
+}
+
+pub fn curvePointFromTangent(cx: i32, cy: i32, tan: f32, len_mult: f32) CurvePoint {
+    const angle = std.math.atan(tan);
+    const v = calc.v2f.init_angle(angle).scale(tangentLength * len_mult).to_i32();
+
+    const half_pp = tangentSquareSize / 2;
+    const px: i32 = cx + v.x - half_pp;
+    const py: i32 = cy + v.y - half_pp;
+
+    return .{
+        .x = @as(f32, @floatFromInt((px + half_pp * 2 - sx))) / @as(f32, @floatFromInt(wx)),
+        .y = 1.0 - @as(f32, @floatFromInt((py + half_pp * 2 - sy))) / @as(f32, @floatFromInt(wy)),
+        .tan_left = 0,
+        .tan_right = 0,
+    };
+}
+
 pub fn curveEditorMain() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
 
-    const lineWidth = 2;
-    const lineSpacingX = 50;
-    const lineSpacingY = 50;
+    points.append(.{ .x = 0, .y = 0, .tan_left = 0, .tan_right = 0 }) catch unreachable;
+    points.append(.{ .x = 1, .y = 1, .tan_left = 0, .tan_right = 0 }) catch unreachable;
 
-    // a / lineSpacingX *
-    const rectSizeX = (gameState.winWidth / 2) / lineSpacingX * lineSpacingX;
-    const rectSizeY = (gameState.winHeight / 2) / lineSpacingY * lineSpacingY;
+    var tangent_points: [2]CurvePoint = undefined;
+    var set_tangent_points = false;
 
-    const lineCountX = rectSizeX / lineSpacingX;
-    const lineCountY = rectSizeY / lineSpacingY;
+    var selected_point: i32 = -1;
+    var prev_hovered: i32 = -1;
+    var was_mouse_down: bool = false;
 
-    const lineDots = 20;
-    const lineDotsX = rectSizeX / lineDots;
-    const lineDotsY = rectSizeY / lineDots * 16 / 9;
-
-    const camera = rl.Camera2D{
-        .offset = rl.Vector2{
-            .x = gameState.winWidth / 2 - rectSizeX / 2,
-            .y = gameState.winHeight / 2 - rectSizeY / 2,
-        },
-        .target = rl.Vector2{ .x = 0, .y = 0 },
-        .rotation = 0.0,
-        .zoom = 1.0,
-    };
+    var prev_hovered_tangent_point: i32 = -1;
+    var selected_tangent_point: i32 = -1;
 
     while (!rl.WindowShouldClose()) {
         rl.BeginDrawing();
         rl.ClearBackground(rl.BLACK);
 
-        rl.BeginMode2D(camera);
-        rl.rlSetLineWidth(lineWidth);
-        for (0..lineCountY + 1) |y| {
-            drawLineDotted(
-                0,
-                @intCast(y * lineSpacingY),
-                rectSizeX,
-                @intCast(y * lineSpacingY),
-                lineDotsX,
-                rl.GRAY,
-            );
+        // update state
+        const inside = mouseInsideRect();
+
+        var hovered_point: i32 = -1;
+        if ((!inside or prev_hovered < 0 or !was_mouse_down)) {
+            hovered_point = mouseHoveredPoint(points.items, pointSize, -1);
+        } else {
+            hovered_point = prev_hovered;
         }
-        for (0..lineCountX + 1) |x| {
-            drawLineDotted(
-                @intCast(x * lineSpacingX),
-                0,
-                @intCast(x * lineSpacingX),
-                rectSizeY,
-                lineDotsY,
-                rl.GRAY,
-            );
+        prev_hovered = hovered_point;
+        was_mouse_down = false;
+
+        var hovered_tangent_point: i32 = -1;
+        if (set_tangent_points) {
+            if (selected_tangent_point < 0 or prev_hovered_tangent_point >= 0) {
+                hovered_tangent_point = mouseHoveredPoint(&tangent_points, tangentSquareSize, prev_hovered_tangent_point);
+            }
+            prev_hovered_tangent_point = hovered_tangent_point;
+
+            if (hovered_tangent_point >= 0) {
+                if (rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_LEFT)) {
+                    selected_tangent_point = hovered_tangent_point;
+                }
+            }
+
+            if (selected_tangent_point >= 0) {
+                if (rl.IsMouseButtonReleased(rl.MOUSE_BUTTON_LEFT)) {
+                    selected_tangent_point = -1;
+                } else {
+                    const po = points.items[@intCast(selected_point)].to_v2f();
+                    const p = &tangent_points[@intCast(selected_tangent_point)];
+                    movePoint(p);
+                    const new_angle = p.to_v2f().sub(po).get_angle();
+                    p.tan_left = std.math.tan(-new_angle);
+                }
+            }
+
+            {
+                const p = tangent_points[0];
+                const cx = sx + @as(i32, @intFromFloat(p.x * wx)) - pointSize / 2;
+                const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy)) - pointSize / 2;
+                rl.DrawRectangle(cx, cy, pointSize, pointSize, rl.RED);
+            }
+            {
+                const p = tangent_points[1];
+                const cx = sx + @as(i32, @intFromFloat(p.x * wx)) - pointSize / 2;
+                const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy)) - pointSize / 2;
+                rl.DrawRectangle(cx, cy, pointSize, pointSize, rl.RED);
+            }
         }
-        rl.EndMode2D();
+
+        if (selected_tangent_point < 0 and hovered_point >= 0 and prev_hovered >= 0 and rl.IsMouseButtonDown(rl.MOUSE_BUTTON_LEFT)) {
+            selected_point = hovered_point;
+
+            const p = points.items[@intCast(selected_point)];
+            const cx = sx + @as(i32, @intFromFloat(p.x * wx)) - pointSize / 2;
+            const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy)) - pointSize / 2;
+            tangent_points[0] = curvePointFromTangent(cx, cy, p.tan_left, -1);
+            tangent_points[1] = curvePointFromTangent(cx, cy, p.tan_right, 1);
+            set_tangent_points = true;
+
+            movePoint(&points.items[@intCast(selected_point)]);
+            clampPoint(&points.items[@intCast(selected_point)]);
+            was_mouse_down = true;
+        } else if (selected_tangent_point < 0 and inside and hovered_point >= 0 and rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_RIGHT)) {
+            _ = points.orderedRemove(@intCast(hovered_point));
+        } else if (selected_tangent_point < 0 and inside and hovered_point < 0 and rl.IsMouseButtonPressed(rl.MOUSE_BUTTON_LEFT)) {
+            const x_percentage = @max(0, @min(1.0, (rl.GetMousePosition().x - @as(f32, @floatFromInt(sx))) / @as(f32, @floatFromInt(wx))));
+            const y_percentage = @max(0, @min(1.0, (rl.GetMousePosition().y - @as(f32, @floatFromInt(sy))) / @as(f32, @floatFromInt(wy))));
+            const point = CurvePoint{
+                .x = x_percentage,
+                .y = 1.0 - y_percentage,
+                .tan_left = 0,
+                .tan_right = 0,
+            };
+            const idx = getPointInsertIndex(x_percentage);
+            points.insert(idx, point) catch unreachable;
+            // hovered_point = @intCast(idx);
+            // selected_point = @intCast(idx);
+        }
+
+        drawLinesAndLabels();
+
+        for (0..points.items.len - 1) |idx| {
+            drawHermiteCurve(points.items[idx], points.items[idx + 1], lineSegmentCnt, lineColor);
+        }
+
+        for (points.items, 0..) |p, i| {
+            const cx = sx + @as(i32, @intFromFloat(p.x * wx)) - pointSize / 2;
+            const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy)) - pointSize / 2;
+
+            if (i == hovered_point) {
+                rl.DrawRectangleLines(
+                    cx - pointHoverOffset,
+                    cy - pointHoverOffset,
+                    pointSize + pointHoverOffset * 2,
+                    pointSize + pointHoverOffset * 2,
+                    pointHoverColor,
+                );
+            }
+
+            rl.DrawRectangle(cx, cy, pointSize, pointSize, if (i == selected_point) selectedPointColor else pointColor);
+        }
+
+        if (selected_point >= 0) {
+            const i: usize = @intCast(selected_point);
+            if (selected_tangent_point >= 0) {
+                points.items[i].tan_left = tangent_points[@intCast(1 - selected_tangent_point)].tan_left;
+                points.items[i].tan_right = tangent_points[@intCast(selected_tangent_point)].tan_left;
+            }
+            const p = points.items[i];
+            const cx = sx + @as(i32, @intFromFloat(p.x * wx));
+            const cy = sy + @as(i32, @intFromFloat((1.0 - p.y) * wy));
+            if (selected_point != 0) {
+                drawTangentLine(cx, cy, -1.0, p.tan_left, hovered_tangent_point == 0);
+            }
+            if (selected_point != points.items.len - 1) {
+                drawTangentLine(cx, cy, 1.0, p.tan_right, hovered_tangent_point == 1);
+            }
+        }
 
         rl.DrawFPS(20, gameState.winHeight - 20);
         rl.EndDrawing();
     }
 
+    points.deinit();
     rl.CloseWindow();
 }
 

@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const v2i = packed struct {
     x: i32 = 0,
     y: i32 = 0,
@@ -73,7 +75,7 @@ pub const v2f = packed struct {
     }
 
     pub fn to_i32(a: v2f) v2i {
-        return v2f{ @intFromFloat(a.x), @intFromFloat(a.y) };
+        return v2i{ .x = @intFromFloat(a.x), .y = @intFromFloat(a.y) };
     }
 
     pub fn round(v: v2f) v2f {
@@ -86,6 +88,19 @@ pub const v2f = packed struct {
 
     pub fn distance(v1: v2f, v2: v2f) f32 {
         return v2.sub(v1).len();
+    }
+
+    pub fn get_angle(v: v2f) f32 {
+        return std.math.atan2(v.y, v.x);
+    }
+
+    pub fn rotate(self: v2f, theta: f32) v2f {
+        const cos_theta = std.math.cos(theta);
+        const sin_theta = std.math.sin(theta);
+        return v2f{
+            .x = self.x * cos_theta - self.y * sin_theta,
+            .y = self.x * sin_theta + self.y * cos_theta,
+        };
     }
 };
 

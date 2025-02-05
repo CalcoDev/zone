@@ -1,5 +1,9 @@
 const std = @import("std");
 
+pub fn sign(b: f32) f32 {
+    return if (b > 0) 1 else -1;
+}
+
 pub const v2i = packed struct {
     x: i32 = 0,
     y: i32 = 0,
@@ -31,6 +35,10 @@ pub const v2f = packed struct {
 
     pub fn init(x: f32, y: f32) v2f {
         return v2f{ .x = x, .y = y };
+    }
+
+    pub fn init_double(v: f32) v2f {
+        return init(v, v);
     }
 
     pub fn add(a: v2f, b: v2f) v2f {

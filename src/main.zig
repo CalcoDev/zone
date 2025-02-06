@@ -6,8 +6,17 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
-const rgui = @cImport({
-    @cInclude("raygui.h");
+// const rgui = @cImport({
+//     @cInclude("raygui.h");
+// });
+
+const imgui = @cImport({
+    @cInclude("rlImGui.h");
+});
+
+const cimgui = @cImport({
+    // @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS");
+    @cInclude("cimgui_include.h");
 });
 
 const gl = @cImport({
@@ -455,6 +464,8 @@ pub fn curveEditorMain() !void {
     var selected_tangent_point: i32 = -1;
 
     var last_stored_real_pos = calc.v2f.init(0, 0);
+    var inside = false;
+    var was_inside = false;
 
     while (!rl.WindowShouldClose()) {
         rl.BeginDrawing();
@@ -480,7 +491,8 @@ pub fn curveEditorMain() !void {
         }
 
         // update state
-        const inside = mouseInsideRect();
+        was_inside = inside;
+        inside = mouseInsideRect();
 
         var hovered_point: i32 = -1;
         if ((!inside or prev_hovered < 0 or !was_mouse_down)) {
@@ -638,6 +650,62 @@ pub fn curveEditorMain() !void {
     rl.CloseWindow();
 }
 
+pub fn imguiMain() !void {
+    rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
+    rl.SetTargetFPS(gameState.gameFps);
+
+    var camera = rl.Camera3D{
+        .projection = rl.CAMERA_ORTHOGRAPHIC,
+        .fovy = 1280.0 / 2.0,
+        .position = rl.Vector3{ .x = 0.0, .y = 0.0, .z = -10.0 },
+        .target = rl.Vector3{ .x = 0.0, .y = 0.0, .z = 0.0 },
+        .up = rl.Vector3{ .x = 0.0, .y = -1.0, .z = 0.0 },
+    };
+
+    const tex = rl.LoadTexture("res/player.png");
+
+    imgui.rlImGuiSetup(true);
+
+    while (!rl.WindowShouldClose()) {
+        const movement = calc.v2i.init(
+            @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_D))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_A))),
+            @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_S))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_W))),
+        );
+        const vel = movement.to_f32().normalize().scale(gameState.playerSpeed * 4.0);
+        camera.position.x = camera.position.x + vel.x;
+        camera.position.y = camera.position.y + vel.y;
+        camera.target.x = camera.position.x;
+        camera.target.y = camera.position.y;
+
+        rl.BeginDrawing();
+        rl.ClearBackground(rl.BLACK);
+
+        rl.BeginMode3D(camera);
+        rl.EndMode3D();
+
+        rl.DrawFPS(20, gameState.winHeight - 20);
+
+        imgui.rlImGuiBegin();
+        // const texs: [*c]const imgui.Texture = @ptrCast(&tex);
+        // imgui.rlImGuiImage(texs);
+        if (cimgui.igButton("Some button", .{ .x = 400, .y = 200 })) {
+            std.log.debug("CLICKED BUTTON!!!!", .{});
+        }
+
+        imgui.rlImGuiEnd();
+
+        rl.EndDrawing();
+    }
+
+    rl.UnloadTexture(tex);
+
+    imgui.rlImGuiShutdown();
+
+    rl.CloseWindow();
+}
+
 pub fn main() !void {
-    try curveEditorMain();
+    // try curveEditorMain();
+    // try gameMain();
+    try imguiMain();
 }

@@ -24,7 +24,11 @@ pub fn build(b: *std.Build) void {
     const raylib = raylib_dep.artifact("raylib");
     exe.linkLibrary(raylib);
 
-    const raygui = b.addStaticLibrary(.{ .name = "raygui", .target = target, .optimize = optimize });
+    const raygui = b.addStaticLibrary(.{
+        .name = "raygui",
+        .target = target,
+        .optimize = optimize,
+    });
     raygui.addCSourceFile(.{
         .file = b.path("third_party/raygui/raygui_impl.c"),
         .flags = &.{"-std=c11"},
@@ -34,6 +38,75 @@ pub fn build(b: *std.Build) void {
     raygui.linkLibC();
 
     exe.linkLibrary(raygui);
+
+    const cimgui = b.addStaticLibrary(.{
+        .name = "cimgui",
+        .target = target,
+        .optimize = optimize,
+    });
+    const cimgui_sources: []const std.Build.LazyPath = &.{
+        b.path("third_party/cimgui/cimgui.cpp"),
+        b.path("third_party/cimgui/imgui/imgui.cpp"),
+        b.path("third_party/cimgui/imgui/imgui_demo.cpp"),
+        b.path("third_party/cimgui/imgui/imgui_draw.cpp"),
+        b.path("third_party/cimgui/imgui/imgui_tables.cpp"),
+        b.path("third_party/cimgui/imgui/imgui_widgets.cpp"),
+        // b.path("third_party/cimgui/imgui/backends/imgui_impl_open"),
+    };
+    cimgui.addIncludePath(b.path("third_party/cimgui/"));
+    cimgui.addIncludePath(b.path("third_party/cimgui/imgui/"));
+    for (cimgui_sources) |source| {
+        cimgui.addCSourceFile(.{
+            .file = source,
+            .flags = &.{ "-std=c++11", "-fvisibility=hidden", "-fno-rtti", "-DIMGUI_DISABLE_OBSOLETE_KEYIO=1", "-fno-exceptions" },
+        });
+    }
+    cimgui.linkLibCpp();
+
+    // const rlimgui = b.addStaticLibrary(.{
+    //     .name = "rlImGui",
+    //     .target = target,
+    //     .optimize = optimize,
+    // });
+    // how do this an link
+
+    const rlimgui = b.addStaticLibrary(.{
+        .name = "rlImGui",
+        .target = target,
+        .optimize = optimize,
+    });
+    rlimgui.addCSourceFile(.{
+        .file = b.path("third_party/rlImGui/rlImGui.cpp"),
+        .flags = &.{"-std=c++11"},
+    });
+    rlimgui.addIncludePath(b.path("third_party/rlImGui/"));
+    rlimgui.addIncludePath(b.path("third_party/cimgui/"));
+    rlimgui.addIncludePath(b.path("third_party/cimgui/imgui/"));
+    rlimgui.linkLibrary(raylib);
+    rlimgui.linkLibrary(cimgui);
+    rlimgui.linkLibCpp();
+
+    const rlimgui_link = b.addStaticLibrary(.{
+        .name = "raygui_include",
+        .target = target,
+        .optimize = optimize,
+    });
+    rlimgui_link.addCSourceFile(.{
+        .file = b.path("third_party/cimgui/cimgui_include.c"),
+        .flags = &.{"-std=c11"},
+    });
+    rlimgui_link.addIncludePath(b.path("third_party/cimgui/generator/output/"));
+    rlimgui_link.linkLibrary(rlimgui);
+
+    exe.addIncludePath(b.path("third_party/cimgui"));
+    exe.addIncludePath(b.path("third_party/rlImGui/"));
+    exe.addIncludePath(b.path("third_party/cimgui/generator/output/"));
+    exe.linkLibrary(rlimgui_link);
+
+    // exe.linkLibrary(rlimgui);
+
+    // exe.addIncludePath(b.path("third_party/cimgui/"));
+    // exe.addIncludePath(b.path("third_party/rlImGui/"));
 
     const run_cmd = b.addRunArtifact(exe);
 

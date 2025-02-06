@@ -92,13 +92,14 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
     rlimgui_link.addCSourceFile(.{
-        .file = b.path("third_party/cimgui/cimgui_include.c"),
+        .file = b.path("third_party/cimgui_helpers/cimgui_include.c"),
         .flags = &.{"-std=c11"},
     });
     rlimgui_link.addIncludePath(b.path("third_party/cimgui/generator/output/"));
     rlimgui_link.linkLibrary(rlimgui);
 
-    exe.addIncludePath(b.path("third_party/cimgui"));
+    // exe.addIncludePath(b.path("third_party/cimgui"));
+    exe.addIncludePath(b.path("third_party/cimgui_helpers/"));
     exe.addIncludePath(b.path("third_party/rlImGui/"));
     exe.addIncludePath(b.path("third_party/cimgui/generator/output/"));
     exe.linkLibrary(rlimgui_link);

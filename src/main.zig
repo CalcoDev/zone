@@ -646,8 +646,8 @@ pub fn curveEditorMain() !void {
 }
 
 pub fn imguiMain() !void {
-    // rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
-    rl.CalcopodWroteThis(gameState.winWidth, gameState.winHeight, gameState.winTitle, 69);
+    rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
+    // rl.CalcopodWroteThis(gameState.winWidth, gameState.winHeight, gameState.winTitle, 69);
     rl.SetTargetFPS(gameState.gameFps);
 
     var camera = rl.Camera3D{

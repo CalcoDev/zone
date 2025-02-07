@@ -51,13 +51,6 @@ pub fn build(b: *std.Build) void {
     }
     cimgui.linkLibCpp();
 
-    // const rlimgui = b.addStaticLibrary(.{
-    //     .name = "rlImGui",
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // how do this an link
-
     const rlimgui = b.addStaticLibrary(.{
         .name = "rlImGui",
         .target = target,

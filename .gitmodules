@@ -8,3 +8,6 @@
 [submodule "third_party/rlImGui"]
 	path = third_party/rlImGui
 	url = https://github.com/raylib-extras/rlImGui
+[submodule "third_party/glfw"]
+	path = third_party/glfw
+	url = https://github.com/glfw/glfw.git

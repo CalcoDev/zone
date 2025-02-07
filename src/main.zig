@@ -6,12 +6,12 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
-const rlImGui = @cImport({
-    @cInclude("rlImGui.h");
+const cimgui = @cImport({
+    @cInclude("cimgui_include.h");
 });
 
-const imgui = @cImport({
-    @cInclude("cimgui_include.h");
+const glfw = @cImport({
+    @cInclude("GLFW/glfw3.h");
 });
 
 const gl = @cImport({
@@ -647,7 +647,6 @@ pub fn curveEditorMain() !void {
 
 pub fn imguiMain() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
-    // rl.CalcopodWroteThis(gameState.winWidth, gameState.winHeight, gameState.winTitle, 69);
     rl.SetTargetFPS(gameState.gameFps);
 
     var camera = rl.Camera3D{
@@ -660,19 +659,25 @@ pub fn imguiMain() !void {
 
     const tex = rl.LoadTexture("res/player.png");
 
-    rlImGui.rlImGuiSetup(false);
+    const imgui_context = cimgui.igCreateContext(null);
+    const io = cimgui.igGetIO();
+    io.*.ConfigFlags |= cimgui.ImGuiConfigFlags_ViewportsEnable;
 
-    // cimgui.igGetIO().*.ConfigFlags |= cimgui.ImGuiConfigFlags_DockingEnable;
-    imgui.igGetIO().*.ConfigFlags |= imgui.ImGuiConfigFlags_ViewportsEnable;
+    const style = cimgui.igGetStyle();
+    // cimgui.igStyleColorsDark(style);
+    cimgui.igStyleColorsLight(style);
+    style.*.WindowRounding = 0.0;
+    style.*.Colors[cimgui.ImGuiCol_WindowBg].w = 1.0;
 
-    imgui.igGetIO().*.FontGlobalScale = 2.0;
-    // can confirm we have docking
-    // const has_dock = @hasDecl(cimgui, "IMGUI_HAS_DOCK");
-    // if (has_dock) {
-    //     std.log.debug("AAAAA", .{});
-    // }
+    _ = cimgui.ImGui_ImplGlfw_InitForOpenGL(@ptrCast(rl.CALCO_getGlfwContext()), true);
+    _ = cimgui.ImGui_ImplOpenGL3_Init("#version 130");
 
-    var wopen = true;
+    // rlImGui.rlImGuiSetup(true);
+    // imgui.igGetIO().*.ConfigFlags |= imgui.ImGuiConfigFlags_ViewportsEnable;
+    // imgui.igGetIO().*.FontGlobalScale = 2.0;
+
+    // var wopen = true;
+    var demo_open = true;
 
     while (!rl.WindowShouldClose()) {
         const movement = calc.v2i.init(
@@ -685,33 +690,40 @@ pub fn imguiMain() !void {
         camera.target.x = camera.position.x;
         camera.target.y = camera.position.y;
 
-        rl.BeginDrawing();
-        rl.ClearBackground(rl.BLACK);
+        cimgui.ImGui_ImplOpenGL3_NewFrame();
+        cimgui.ImGui_ImplGlfw_NewFrame();
+        cimgui.igNewFrame();
 
+        if (demo_open) {
+            cimgui.igShowDemoWindow(&demo_open);
+        }
+
+        cimgui.igRender();
+
+        rl.rlViewport(0, 0, gameState.winWidth, gameState.winHeight);
+        rl.rlClearColor(0, 0, 0, 255);
+        rl.rlClearScreenBuffers();
+
+        cimgui.ImGui_ImplOpenGL3_RenderDrawData(cimgui.igGetDrawData());
+
+        const backup_context = rl.CALCO_getGlfwContext();
+        cimgui.igUpdatePlatformWindows();
+        cimgui.igRenderPlatformWindowsDefault(null, null);
+        rl.CALCO_setGlfwContext(backup_context);
+
+        rl.BeginDrawing();
         rl.BeginMode3D(camera);
         rl.EndMode3D();
-
         rl.DrawFPS(20, gameState.winHeight - 20);
-
-        rlImGui.rlImGuiBegin();
-
-        _ = imgui.igDockSpaceOverViewport(0, null, imgui.ImGuiDockNodeFlags_None, null);
-
-        if (imgui.igBegin("WINDOW", &wopen, imgui.ImGuiWindowFlags_None)) {
-            imgui.igTextUnformatted("AAAAAAAAAAAAAAAAAA", " B ");
-        }
-        imgui.igEnd();
-        rlImGui.rlImGuiEnd();
-
-        imgui.igUpdatePlatformWindows();
-        imgui.igRenderPlatformWindowsDefault(null, null);
 
         rl.EndDrawing();
     }
 
     rl.UnloadTexture(tex);
 
-    rlImGui.rlImGuiShutdown();
+    cimgui.ImGui_ImplOpenGL3_Shutdown();
+    cimgui.ImGui_ImplGlfw_Shutdown();
+    cimgui.igDestroyContext(imgui_context);
 
     rl.CloseWindow();
 }

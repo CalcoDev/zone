@@ -7,7 +7,11 @@ const rl = @cImport({
 });
 
 const cimgui = @cImport({
-    @cInclude("cimgui_include.h");
+    @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "1");
+    @cDefine("CIMGUI_USE_GLFW", "1");
+    @cDefine("CIMGUI_USE_OPENGL3", "1");
+    @cInclude("cimgui.h");
+    @cInclude("cimgui_impl.h");
 });
 
 const glfw = @cImport({
@@ -662,19 +666,15 @@ pub fn imguiMain() !void {
     const imgui_context = cimgui.igCreateContext(null);
     const io = cimgui.igGetIO();
     io.*.ConfigFlags |= cimgui.ImGuiConfigFlags_ViewportsEnable;
+    // io.*.ConfigFlags.FontGlobalScale = ...
 
     const style = cimgui.igGetStyle();
-    // cimgui.igStyleColorsDark(style);
-    cimgui.igStyleColorsLight(style);
+    cimgui.igStyleColorsDark(style);
     style.*.WindowRounding = 0.0;
     style.*.Colors[cimgui.ImGuiCol_WindowBg].w = 1.0;
 
     _ = cimgui.ImGui_ImplGlfw_InitForOpenGL(@ptrCast(rl.CALCO_getGlfwContext()), true);
     _ = cimgui.ImGui_ImplOpenGL3_Init("#version 130");
-
-    // rlImGui.rlImGuiSetup(true);
-    // imgui.igGetIO().*.ConfigFlags |= imgui.ImGuiConfigFlags_ViewportsEnable;
-    // imgui.igGetIO().*.FontGlobalScale = 2.0;
 
     // var wopen = true;
     var demo_open = true;

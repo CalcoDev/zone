@@ -17,8 +17,8 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(exe);
 
-    exe.addIncludePath(b.path("third_party/glad/include"));
-
+    // RAYLIB
+    // Internally builds and links: GLFW, GLAD
     const raylib_dep = b.dependency("raylib", .{
         .target = target,
         .optimize = optimize,
@@ -27,6 +27,17 @@ pub fn build(b: *std.Build) void {
     const raylib = raylib_dep.artifact("raylib");
     exe.linkLibrary(raylib);
 
+    // GLAD
+    // Already built by Raylib.
+    exe.addIncludePath(b.path("third_party/glad/include/"));
+
+    // GLFW
+    // Aready built by Raylb.
+    exe.addIncludePath(b.path("third_party/glfw/include/"));
+
+    // IMGUI / CIMGUI
+    // We build this as a C++ library, and then use a helper library to
+    // actually convert it to C. Scuffed but it'll do for now.
     const cimgui = b.addStaticLibrary(.{
         .name = "cimgui",
         .target = target,
@@ -43,67 +54,27 @@ pub fn build(b: *std.Build) void {
         b.path("third_party/cimgui/imgui/backends/imgui_impl_glfw.cpp"),
         b.path("third_party/cimgui/imgui/backends/imgui_impl_opengl3.cpp"),
     };
-    cimgui.root_module.addCMacro("IMGUI_DISABLE_OBSOLETE_FUNCTIONS", "1");
-    cimgui.root_module.addCMacro("IMGUI_DISABLE_OBSOLETE_KEYIO", "1");
-    cimgui.root_module.addCMacro("IMGUI_IMPL_API", "extern \"C\"");
-    // cimgui.root_module.addCMacro("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "1");
-    cimgui.root_module.addCMacro("CIMGUI_USE_GLFW", "1");
-    cimgui.root_module.addCMacro("CIMGUI_USE_OPENGL3", "1");
+    const cimgui_macros: []const [2][]const u8 = &.{
+        .{ "IMGUI_DISABLE_OBSOLETE_FUNCTIONS", "1" },
+        .{ "IMGUI_DISABLE_OBSOLETE_KEYIO", "1" },
+        .{ "IMGUI_IMPL_API", "extern \"C\"" },
+        .{ "CIMGUI_USE_GLFW", "1" },
+        .{ "CIMGUI_USE_OPENGL3", "1" },
+    };
     cimgui.addIncludePath(b.path("third_party/cimgui/"));
     cimgui.addIncludePath(b.path("third_party/cimgui/imgui/"));
     cimgui.addIncludePath(b.path("third_party/glfw/include/"));
-    for (cimgui_sources) |source| {
-        cimgui.addCSourceFile(.{
-            .file = source,
-            .flags = &.{ "-std=c++11", "-fvisibility=hidden" },
-        });
+    for (cimgui_macros) |macro| {
+        cimgui.root_module.addCMacro(macro[0], macro[1]);
     }
+    for (cimgui_sources) |source| {
+        cimgui.addCSourceFile(.{ .file = source, .flags = &.{ "-std=c++11", "-fvisibility=hidden" } });
+    }
+    exe.addIncludePath(b.path("third_party/cimgui/"));
+    exe.addIncludePath(b.path("third_party/cimgui/generator/output/"));
+    exe.linkLibrary(cimgui);
 
-    const cimgui_link = b.addStaticLibrary(.{ .name = "cimgui_link", .target = target, .optimize = optimize });
-    cimgui_link.addCSourceFile(.{
-        .file = b.path("third_party/cimgui_helpers/cimgui_include.c"),
-        .flags = &.{},
-    });
-    cimgui_link.linkLibrary(cimgui);
-    cimgui_link.linkLibC();
-
-    exe.addIncludePath(b.path("third_party/cimgui_helpers/"));
-    exe.addIncludePath(b.path("third_party/glfw/include/"));
-    exe.linkLibrary(cimgui_link);
-
-    // const rlimgui = b.addStaticLibrary(.{
-    //     .name = "rlImGui",
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // rlimgui.addCSourceFile(.{
-    //     .file = b.path("third_party/rlImGui/rlImGui.cpp"),
-    //     .flags = &.{"-std=c++11"},
-    // });
-    // rlimgui.addIncludePath(b.path("third_party/rlImGui/"));
-    // rlimgui.addIncludePath(b.path("third_party/cimgui/"));
-    // rlimgui.addIncludePath(b.path("third_party/cimgui/imgui/"));
-    // rlimgui.linkLibrary(raylib);
-    // rlimgui.linkLibrary(cimgui);
-    // rlimgui.linkLibCpp();
-
-    // const rlimgui_link = b.addStaticLibrary(.{
-    //     .name = "raygui_include",
-    //     .target = target,
-    //     .optimize = optimize,
-    // });
-    // rlimgui_link.addCSourceFile(.{
-    //     .file = b.path("third_party/cimgui_helpers/cimgui_include.c"),
-    //     .flags = &.{"-std=c11"},
-    // });
-    // rlimgui_link.addIncludePath(b.path("third_party/cimgui/generator/output/"));
-    // rlimgui_link.linkLibrary(rlimgui);
-
-    // exe.addIncludePath(b.path("third_party/rlImGui/"));
-    // exe.linkLibrary(rlimgui_link);
-    // exe.addIncludePath(b.path("third_party/cimgui_helpers/"));
-    // exe.addIncludePath(b.path("third_party/cimgui/generator/output/"));
-
+    // Back to zig stuff now
     const run_cmd = b.addRunArtifact(exe);
 
     run_cmd.step.dependOn(b.getInstallStep());
@@ -116,6 +87,7 @@ pub fn build(b: *std.Build) void {
     run_step.dependOn(&run_cmd.step);
 }
 
+// Copied from third_party/raylib/build.zig
 pub const OpenglVersion = enum {
     auto,
     gl_1_1,

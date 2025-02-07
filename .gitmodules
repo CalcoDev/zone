@@ -1,6 +1,7 @@
 [submodule "third_party/cimgui"]
 	path = third_party/cimgui
 	url = https://github.com/cimgui/cimgui
+	branch = docking_inter
 [submodule "third_party/rlImGui"]
 	path = third_party/rlImGui
 	url = https://github.com/raylib-extras/rlImGui

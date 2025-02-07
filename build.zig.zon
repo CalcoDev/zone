@@ -3,7 +3,7 @@
     .version = "0.0.0",
     .dependencies = .{
         .raylib = .{
-            .path = "third_party/rayopod",
+            .path = "third_party/raylib",
         },
     },
     .paths = .{

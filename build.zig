@@ -18,7 +18,6 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(exe);
 
     exe.addIncludePath(b.path("third_party/glad/include"));
-    exe.addIncludePath(b.path("third_party/raygui/include"));
 
     const raylib_dep = b.dependency("raylib", .{
         .target = target,
@@ -27,21 +26,6 @@ pub fn build(b: *std.Build) void {
     });
     const raylib = raylib_dep.artifact("raylib");
     exe.linkLibrary(raylib);
-
-    const raygui = b.addStaticLibrary(.{
-        .name = "raygui",
-        .target = target,
-        .optimize = optimize,
-    });
-    raygui.addCSourceFile(.{
-        .file = b.path("third_party/raygui/raygui_impl.c"),
-        .flags = &.{"-std=c11"},
-    });
-    raygui.addIncludePath(b.path("third_party/raygui/include/"));
-    raygui.linkLibrary(raylib);
-    raygui.linkLibC();
-
-    exe.linkLibrary(raygui);
 
     const cimgui = b.addStaticLibrary(.{
         .name = "cimgui",

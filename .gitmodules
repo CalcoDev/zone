@@ -4,3 +4,6 @@
 [submodule "third_party/rlImGui"]
 	path = third_party/rlImGui
 	url = https://github.com/raylib-extras/rlImGui
+[submodule "third_party/raylib"]
+	path = third_party/raylib
+	url = https://github.com/raysan5/raylib

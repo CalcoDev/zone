@@ -6,16 +6,11 @@ const rl = @cImport({
     @cInclude("raymath.h");
 });
 
-// const rgui = @cImport({
-//     @cInclude("raygui.h");
-// });
-
-const imgui = @cImport({
+const rlImGui = @cImport({
     @cInclude("rlImGui.h");
 });
 
-const cimgui = @cImport({
-    // @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS");
+const imgui = @cImport({
     @cInclude("cimgui_include.h");
 });
 
@@ -651,7 +646,8 @@ pub fn curveEditorMain() !void {
 }
 
 pub fn imguiMain() !void {
-    rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
+    // rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
+    rl.CalcopodWroteThis(gameState.winWidth, gameState.winHeight, gameState.winTitle, 69);
     rl.SetTargetFPS(gameState.gameFps);
 
     var camera = rl.Camera3D{
@@ -664,7 +660,19 @@ pub fn imguiMain() !void {
 
     const tex = rl.LoadTexture("res/player.png");
 
-    imgui.rlImGuiSetup(true);
+    rlImGui.rlImGuiSetup(false);
+
+    // cimgui.igGetIO().*.ConfigFlags |= cimgui.ImGuiConfigFlags_DockingEnable;
+    imgui.igGetIO().*.ConfigFlags |= imgui.ImGuiConfigFlags_ViewportsEnable;
+
+    imgui.igGetIO().*.FontGlobalScale = 2.0;
+    // can confirm we have docking
+    // const has_dock = @hasDecl(cimgui, "IMGUI_HAS_DOCK");
+    // if (has_dock) {
+    //     std.log.debug("AAAAA", .{});
+    // }
+
+    var wopen = true;
 
     while (!rl.WindowShouldClose()) {
         const movement = calc.v2i.init(
@@ -685,21 +693,25 @@ pub fn imguiMain() !void {
 
         rl.DrawFPS(20, gameState.winHeight - 20);
 
-        imgui.rlImGuiBegin();
-        // const texs: [*c]const imgui.Texture = @ptrCast(&tex);
-        // imgui.rlImGuiImage(texs);
-        if (cimgui.igButton("Some button", .{ .x = 400, .y = 200 })) {
-            std.log.debug("CLICKED BUTTON!!!!", .{});
-        }
+        rlImGui.rlImGuiBegin();
 
-        imgui.rlImGuiEnd();
+        _ = imgui.igDockSpaceOverViewport(0, null, imgui.ImGuiDockNodeFlags_None, null);
+
+        if (imgui.igBegin("WINDOW", &wopen, imgui.ImGuiWindowFlags_None)) {
+            imgui.igTextUnformatted("AAAAAAAAAAAAAAAAAA", " B ");
+        }
+        imgui.igEnd();
+        rlImGui.rlImGuiEnd();
+
+        imgui.igUpdatePlatformWindows();
+        imgui.igRenderPlatformWindowsDefault(null, null);
 
         rl.EndDrawing();
     }
 
     rl.UnloadTexture(tex);
 
-    imgui.rlImGuiShutdown();
+    rlImGui.rlImGuiShutdown();
 
     rl.CloseWindow();
 }

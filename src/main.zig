@@ -1,22 +1,9 @@
 const std = @import("std");
 
-const rl = @import("raylib.zig");
-
-const cimgui = @cImport({
-    @cDefine("CIMGUI_DEFINE_ENUMS_AND_STRUCTS", "1");
-    @cDefine("CIMGUI_USE_GLFW", "1");
-    @cDefine("CIMGUI_USE_OPENGL3", "1");
-    @cInclude("cimgui.h");
-    @cInclude("cimgui_impl.h");
-});
-
-const glfw = @cImport({
-    @cInclude("GLFW/glfw3.h");
-});
-
-const gl = @cImport({
-    @cInclude("glad/glad.h");
-});
+const rl = @import("libs/raylib.zig");
+const cimgui = @import("libs/cimgui.zig");
+const glad = @import("libs/glad.zig");
+const glfw = @import("libs/glfw.zig");
 
 const calc = @import("calc.zig");
 const gameState = @import("game.zig");
@@ -124,12 +111,12 @@ pub fn gameMain() !void {
 
         _ = rl.rlEnableVertexArray(vao);
 
-        gl.glEnable(gl.GL_BLEND);
-        gl.glEnable(gl.GL_DEPTH_TEST);
-        gl.glDepthMask(gl.GL_FALSE);
-        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA);
+        glad.glEnable(glad.GL_BLEND);
+        glad.glEnable(glad.GL_DEPTH_TEST);
+        glad.glDepthMask(glad.GL_FALSE);
+        glad.glBlendFunc(glad.GL_SRC_ALPHA, glad.GL_ONE_MINUS_SRC_ALPHA);
 
-        gl.glDrawArraysInstanced(gl.GL_TRIANGLES, 0, 6, instanceCount);
+        glad.glDrawArraysInstanced(glad.GL_TRIANGLES, 0, 6, instanceCount);
         rl.rlDisableVertexArray();
 
         rl.rlDisableShader();
@@ -153,40 +140,12 @@ pub fn gameMain() !void {
     rl.CloseWindow();
 }
 
-pub fn col(hex: comptime_int) rl.Color {
-    return @bitCast(@as(u32, ((hex & 0xFF000000) >> 24) |
-        ((hex & 0x00FF0000) >> 8) |
-        ((hex & 0x0000FF00) << 8) |
-        ((hex & 0x000000FF) << 24)));
-}
-
-pub fn curveEditorMain() !void {
-    rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
-    rl.SetTargetFPS(gameState.gameFps);
-
-    var editor = curveEditor.createCurveEditor();
-    editor.data.curve.points = std.ArrayList(curves.CurvePoint).init(std.heap.page_allocator);
-    editor.init(&editor.data);
-
-    while (!rl.WindowShouldClose()) {
-        rl.BeginDrawing();
-        rl.ClearBackground(rl.BLACK);
-
-        editor.tick(&editor.data);
-        // editor.draw();
-
-        rl.DrawFPS(20, gameState.winHeight - 20);
-        rl.EndDrawing();
-    }
-
-    editor.deinit(&editor.data);
-
-    rl.CloseWindow();
-}
-
 pub fn imguiMain() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
+
+    var editor = curveEditor.createCurveEditor(std.heap.page_allocator);
+    editor.init();
 
     var camera = rl.Camera3D{
         .projection = rl.CAMERA_ORTHOGRAPHIC,
@@ -195,8 +154,6 @@ pub fn imguiMain() !void {
         .target = rl.Vector3{ .x = 0.0, .y = 0.0, .z = 0.0 },
         .up = rl.Vector3{ .x = 0.0, .y = -1.0, .z = 0.0 },
     };
-
-    const tex = rl.LoadTexture("res/player.png");
 
     const monitor = glfw.glfwGetPrimaryMonitor();
     var x_scale: f32 = 0.0;
@@ -225,6 +182,8 @@ pub fn imguiMain() !void {
         cimgui.ImFontAtlas_GetGlyphRangesDefault(fonts),
     );
 
+    editor.data.axisLabelFontsize *= x_scale;
+
     // var wopen = true;
     var demo_open = true;
 
@@ -248,17 +207,10 @@ pub fn imguiMain() !void {
             cimgui.igShowDemoWindow(&demo_open);
         }
 
-        cimgui.igImage(
-            tex.id,
-            cimgui.ImVec2{ .x = 200, .y = 200 },
-            cimgui.ImVec2{ .x = 0, .y = 0 },
-            cimgui.ImVec2{ .x = 1, .y = 1 },
-            cimgui.ImVec4{ .x = 255, .y = 255, .z = 255, .w = 255 },
-            cimgui.ImVec4{ .x = 255, .y = 255, .z = 255, .w = 255 },
-        );
+        editor.tick();
+        editor.draw();
 
         cimgui.igPopFont();
-
         cimgui.igRender();
 
         rl.rlViewport(0, 0, gameState.winWidth, gameState.winHeight);
@@ -280,7 +232,7 @@ pub fn imguiMain() !void {
         rl.EndDrawing();
     }
 
-    rl.UnloadTexture(tex);
+    editor.deinit();
 
     cimgui.ImGui_ImplOpenGL3_Shutdown();
     cimgui.ImGui_ImplGlfw_Shutdown();
@@ -290,7 +242,6 @@ pub fn imguiMain() !void {
 }
 
 pub fn main() !void {
-    try curveEditorMain();
     // try gameMain();
-    // try imguiMain();
+    try imguiMain();
 }

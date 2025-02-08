@@ -4,6 +4,35 @@ const calc = @import("calc.zig");
 pub const Curve = struct {
     points: std.ArrayList(CurvePoint),
 
+    pub fn init(allocator: std.mem.Allocator) Curve {
+        return .{
+            .points = std.ArrayList(CurvePoint).init(allocator),
+        };
+    }
+
+    pub fn get_length(self: *Curve) usize {
+        return self.points.items.len;
+    }
+
+    pub fn get_point(self: *Curve, idx: usize) CurvePoint {
+        return self.points.items[idx];
+    }
+
+    pub fn sortPoints(self: *Curve, update_indices: bool) bool {
+        for (0..self.points.items.len - 1) |i| {
+            if (self.points.items[i].x > self.points.items[i + 1].x) {
+                std.mem.sort(CurvePoint, self.points.items, {}, CurvePoint.sort);
+                if (update_indices) {
+                    for (0..self.points.items.len) |ii| {
+                        self.points.items[ii].idx = ii;
+                    }
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
     pub fn sample(self: *Curve, offset: f32) f32 {
         if (self.points.items.len == 0) {
             return 0;

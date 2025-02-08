@@ -82,6 +82,10 @@ pub const v2f = packed struct {
         return v2f.init(@cos(angle), @sin(angle));
     }
 
+    pub fn can_i32(a: v2f) bool {
+        return a.x <= std.math.maxInt(i32) and a.x >= std.math.minInt(i32) and a.y <= std.math.maxInt(i32) and a.y >= std.math.minInt(i32);
+    }
+
     pub fn to_i32(a: v2f) v2i {
         return v2i{ .x = @intFromFloat(a.x), .y = @intFromFloat(a.y) };
     }
@@ -109,6 +113,17 @@ pub const v2f = packed struct {
             .x = self.x * cos_theta - self.y * sin_theta,
             .y = self.x * sin_theta + self.y * cos_theta,
         };
+    }
+
+    pub fn clamp(a: v2f, min: v2f, max: v2f) v2f {
+        return v2f.init(
+            @max(min.x, @min(max.x, a.x)),
+            @max(min.y, @min(max.y, a.y)),
+        );
+    }
+
+    pub fn zero() v2f {
+        return v2f.init(0, 0);
     }
 };
 

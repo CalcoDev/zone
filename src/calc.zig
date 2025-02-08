@@ -125,6 +125,10 @@ pub const v2f = packed struct {
     pub fn zero() v2f {
         return v2f.init(0, 0);
     }
+
+    pub fn one() v2f {
+        return v2f.init(1, 1);
+    }
 };
 
 pub const rect2f = packed struct {

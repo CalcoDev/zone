@@ -9,8 +9,11 @@ const calc = @import("calc.zig");
 const gameState = @import("game.zig");
 const entities = @import("entities.zig");
 
-const curveEditor = @import("editor/curve_editor.zig");
 const curves = @import("curves.zig");
+const curveEditor = @import("editor/curve_editor.zig");
+
+const particles = @import("particles/particles.zig");
+const particlesEditor = @import("particles/particles_editor.zig");
 
 var game: gameState.State = undefined;
 
@@ -144,6 +147,42 @@ pub fn imguiMain() !void {
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
 
+    var ps = particles.ParticleSystem{
+        .position = calc.v2f.zero(),
+        .rotation = 0.0,
+
+        .emitting = true,
+        .one_shot = false,
+        .amount = 512,
+
+        .lifetime = 2.5,
+        .speed_scale = 1.0,
+        .explosiveness = 0.0,
+        .randomness = 1.0,
+
+        .local_coords = true,
+        .draw_order = .index,
+
+        .spawn = .{
+            .shape = .{ .point = .{} },
+            .offset = calc.v2f.zero(),
+            .scale = calc.v2f.one(),
+            .angle_min = 0.0,
+            .angle_max = std.math.pi / 2.0,
+        },
+        .animated_velocity = undefined,
+        .display = undefined,
+
+        .particles = undefined,
+        .compute = undefined,
+        .ssbo = undefined,
+        .shader = undefined,
+        .vao = undefined,
+        .vbo = undefined,
+        .dbg_tex = undefined,
+    };
+    ps.init(std.heap.page_allocator);
+
     var editor = curveEditor.createCurveEditor(std.heap.page_allocator);
     editor.init();
 
@@ -184,9 +223,6 @@ pub fn imguiMain() !void {
 
     editor.data.axisLabelFontsize *= x_scale;
 
-    // var wopen = true;
-    var demo_open = true;
-
     while (!rl.WindowShouldClose()) {
         const movement = calc.v2i.init(
             @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_D))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_A))),
@@ -203,13 +239,8 @@ pub fn imguiMain() !void {
         cimgui.igNewFrame();
 
         cimgui.igPushFont(iosevka_font);
-        if (demo_open) {
-            cimgui.igShowDemoWindow(&demo_open);
-        }
-
         editor.tick();
         editor.draw();
-
         cimgui.igPopFont();
         cimgui.igRender();
 
@@ -226,6 +257,11 @@ pub fn imguiMain() !void {
 
         rl.BeginDrawing();
         rl.BeginMode3D(camera);
+
+        // TODO(calco): All things should probably tick at the same time and draw later but meh :skull:
+        ps.tick();
+        ps.draw();
+
         rl.EndMode3D();
         rl.DrawFPS(20, gameState.winHeight - 20);
 
@@ -242,6 +278,5 @@ pub fn imguiMain() !void {
 }
 
 pub fn main() !void {
-    // try gameMain();
     try imguiMain();
 }

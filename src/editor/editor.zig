@@ -1,3 +1,4 @@
+// TODO(calco): refactor this out of the code base it is too bad
 pub fn Editor(comptime TData: type) type {
     return struct {
         data: TData,

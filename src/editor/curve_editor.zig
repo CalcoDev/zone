@@ -14,8 +14,8 @@ fn col(hex: comptime_int) rl.Color {
         ((hex & 0x000000FF) << 24)));
 }
 
-const padx = 16 * 4;
-const pady = 9 * 4;
+const padx = 16 * 2;
+const pady = 9 * 2;
 
 pub const CurveEditor = editor.Editor(CurveEditorData);
 
@@ -211,7 +211,6 @@ pub const CurveEditorData = struct {
             _ = cimgui.igSliderFloat("Max Value", &self.max_value, -1024, 1024, "%.3f", cimgui.ImGuiSliderFlags_None);
             _ = cimgui.igInputInt("Bake Resolution", &self.bake_resolution, 1, 2, cimgui.ImGuiInputFlags_None);
 
-            // cimgui.igBeginGroup();
             cimgui.igText("Points (%d): ", self.curve.get_length());
             cimgui.igIndent(10);
             for (self.curve.points.items) |*point| {
@@ -229,10 +228,7 @@ pub const CurveEditorData = struct {
                     cimgui.igTreePop();
                 }
             }
-
-            if (cimgui.igButton("Bake", @bitCast(calc.v2i.init(self.wx, self.wy).to_f32()))) {
-                std.log.debug("clicked button!", .{});
-            }
+            cimgui.igUnindent(10);
 
             cimgui.igEnd();
         }

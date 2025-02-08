@@ -149,3 +149,13 @@ pub const rect2i = struct {
         };
     }
 };
+
+pub fn bezierInterpolate(start: f32, c1: f32, c2: f32, end: f32, t: f32) f32 {
+    const omt = (1.0 - t);
+    const omt2 = omt * omt;
+    const omt3 = omt2 * omt;
+    const t2 = t * t;
+    const t3 = t2 * t;
+
+    return start * omt3 + c1 * omt2 * t * 3.0 + c2 * omt * t2 * 3.0 + end * t3;
+}

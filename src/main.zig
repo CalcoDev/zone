@@ -663,18 +663,33 @@ pub fn imguiMain() !void {
 
     const tex = rl.LoadTexture("res/player.png");
 
+    const monitor = glfw.glfwGetPrimaryMonitor();
+    var x_scale: f32 = 0.0;
+    var y_scale: f32 = 0.0;
+    glfw.glfwGetMonitorContentScale(monitor, &x_scale, &y_scale);
+
     const imgui_context = cimgui.igCreateContext(null);
     const io = cimgui.igGetIO();
     io.*.ConfigFlags |= cimgui.ImGuiConfigFlags_ViewportsEnable;
-    // io.*.ConfigFlags.FontGlobalScale = ...
 
     const style = cimgui.igGetStyle();
     cimgui.igStyleColorsDark(style);
+    cimgui.ImGuiStyle_ScaleAllSizes(style, x_scale);
     style.*.WindowRounding = 0.0;
     style.*.Colors[cimgui.ImGuiCol_WindowBg].w = 1.0;
 
     _ = cimgui.ImGui_ImplGlfw_InitForOpenGL(@ptrCast(rl.CALCO_getGlfwContext()), true);
     _ = cimgui.ImGui_ImplOpenGL3_Init("#version 130");
+
+    // io.*.Fonts.*.
+    const fonts = io.*.Fonts;
+    const iosevka_font = cimgui.ImFontAtlas_AddFontFromFileTTF(
+        fonts,
+        "res/fonts/iosevka_term.ttf",
+        @round(16.0 * x_scale),
+        null,
+        cimgui.ImFontAtlas_GetGlyphRangesDefault(fonts),
+    );
 
     // var wopen = true;
     var demo_open = true;
@@ -695,7 +710,9 @@ pub fn imguiMain() !void {
         cimgui.igNewFrame();
 
         if (demo_open) {
+            cimgui.igPushFont(iosevka_font);
             cimgui.igShowDemoWindow(&demo_open);
+            cimgui.igPopFont();
         }
 
         cimgui.igRender();

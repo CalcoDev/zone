@@ -76,8 +76,11 @@ pub const CurveEditorData = struct {
     min_value: f32,
     max_value: f32,
     bake_resolution: i32,
+    filename: [32]u8,
 
     raylib_font: rl.Font,
+
+    baked: bool,
 
     pub fn init(self: *CurveEditorData) void {
         self.curve.points.append(.{ .x = 0, .y = 0, .tan_left = 0.0, .tan_right = 1.0, .idx = 0 }) catch unreachable;
@@ -144,6 +147,9 @@ pub const CurveEditorData = struct {
         self.min_value = 1;
 
         self.raylib_font = rl.LoadFont("res/fonts/iosevka_term.ttf");
+        self.filename = std.mem.zeroes([32]u8);
+
+        self.baked = false;
     }
 
     pub fn tick(self: *CurveEditorData) void {
@@ -207,6 +213,7 @@ pub const CurveEditorData = struct {
             cimgui.igPopStyleVar(2);
             cimgui.igPopStyleColor(3);
 
+            // TODO(calco): un hardcode 1024 as max value!
             _ = cimgui.igSliderFloat("Min Value", &self.min_value, -1024, 1024, "%.3f", cimgui.ImGuiSliderFlags_None);
             _ = cimgui.igSliderFloat("Max Value", &self.max_value, -1024, 1024, "%.3f", cimgui.ImGuiSliderFlags_None);
             _ = cimgui.igInputInt("Bake Resolution", &self.bake_resolution, 1, 2, cimgui.ImGuiInputFlags_None);
@@ -229,6 +236,13 @@ pub const CurveEditorData = struct {
                 }
             }
             cimgui.igUnindent(10);
+
+            _ = cimgui.igInputText("Filename", &self.filename, 32, cimgui.ImGuiItemFlags_None, null, null);
+            self.baked = false;
+            if (cimgui.igButton("Bake", @bitCast(calc.v2f.init(200, 100)))) {
+                _ = self.curve.bake(&self.filename, self.bake_resolution, self.min_value, self.max_value);
+                self.baked = true;
+            }
 
             cimgui.igEnd();
         }

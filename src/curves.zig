@@ -1,4 +1,5 @@
 const std = @import("std");
+const rl = @import("libs/raylib.zig");
 const calc = @import("calc.zig");
 
 pub const Curve = struct {
@@ -8,6 +9,41 @@ pub const Curve = struct {
         return .{
             .points = std.ArrayList(CurvePoint).init(allocator),
         };
+    }
+
+    // pub fn bake(self: *Curve, filepath: []const u8, resolution: i32, min_value: f32, max_value: f32) bool {
+    pub fn bake(self: *Curve, filepath: []const u8, resolution: i32, _: f32, _: f32) bool {
+        var data = std.heap.page_allocator.alloc(f32, @intCast(resolution * 4)) catch unreachable;
+        for (0..@intCast(resolution)) |i| {
+            const x = @as(f32, @floatFromInt(i)) / @as(f32, @floatFromInt(resolution));
+            const fofx = self.sample(x);
+            // const scaled = std.math.lerp(min_value, max_value, fofx) / 1024.0; // TODO(calco): un hardcode 1024 as max value!
+            const scaled = fofx;
+            data[i * 4 + 0] = scaled;
+            data[i * 4 + 1] = scaled;
+            data[i * 4 + 2] = scaled;
+            data[i * 4 + 3] = scaled;
+        }
+
+        const image = rl.Image{
+            .data = data.ptr,
+            .width = resolution,
+            .height = 1,
+            .format = rl.PIXELFORMAT_UNCOMPRESSED_R32G32B32A32,
+            .mipmaps = 1,
+        };
+
+        const real_path = rl.TextFormat("res/curves/%s", @as([*c]u8, @ptrCast(@constCast(filepath))));
+        if (rl.ExportImage(image, real_path)) {
+            std.heap.page_allocator.free(data);
+            std.log.debug("Succesfully saved image to filepath {s}!", .{filepath});
+            return true;
+        } else {
+            std.heap.page_allocator.free(data);
+            std.log.debug("Error sabing image to filepath {s}!", .{filepath});
+            return false;
+        }
+        return false;
     }
 
     pub fn get_length(self: *Curve) usize {

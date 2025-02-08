@@ -180,6 +180,7 @@ pub fn imguiMain() !void {
         .vao = undefined,
         .vbo = undefined,
         .dbg_tex = undefined,
+        .scale_curve_tex = undefined,
     };
     ps.init(std.heap.page_allocator);
 
@@ -259,6 +260,13 @@ pub fn imguiMain() !void {
         rl.BeginMode3D(camera);
 
         // TODO(calco): All things should probably tick at the same time and draw later but meh :skull:
+        if (editor.data.baked) {
+            rl.UnloadTexture(ps.scale_curve_tex);
+            const real_path = rl.TextFormat("res/curves/%s", @as([*c]u8, @ptrCast(@constCast(&editor.data.filename))));
+            rl.rlTextureParameters(ps.scale_curve_tex.id, rl.RL_TEXTURE_MAG_FILTER, glad.GL_LINEAR);
+            rl.rlTextureParameters(ps.scale_curve_tex.id, rl.RL_TEXTURE_MIN_FILTER, glad.GL_LINEAR);
+            ps.scale_curve_tex = rl.LoadTexture(real_path);
+        }
         ps.tick();
         ps.draw();
 

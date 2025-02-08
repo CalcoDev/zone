@@ -79,7 +79,13 @@ pub const ParticleSystem = struct {
 
     dbg_tex: rl.Texture,
 
+    scale_curve_tex: rl.Texture,
+
     pub fn init(self: *ParticleSystem, allocator: std.mem.Allocator) void {
+        self.scale_curve_tex = rl.LoadTexture("res/curves/sample2.png");
+        rl.rlTextureParameters(self.scale_curve_tex.id, rl.RL_TEXTURE_MAG_FILTER, glad.GL_LINEAR);
+        rl.rlTextureParameters(self.scale_curve_tex.id, rl.RL_TEXTURE_MIN_FILTER, glad.GL_LINEAR);
+
         self.particles = allocator.alloc(Particle, @intCast(self.amount)) catch unreachable;
 
         const compute_data = rl.LoadFileText("res/shaders/particles/simulate.glsl");
@@ -121,6 +127,14 @@ pub const ParticleSystem = struct {
     pub fn tick(self: *ParticleSystem) void {
         rl.rlEnableShader(self.compute);
         rl.rlSetUniform(0, &rl.GetFrameTime(), rl.SHADER_UNIFORM_FLOAT, 1);
+
+        // rl.rlActiveTextureSlot(0);
+        // rl.rlEnableTexture(self.scale_curve_tex.id);
+        // const loc = glad.glGetUniformLocation(self.compute, "u_scale_tex");
+        glad.glUniform1i(1, 0);
+        glad.glActiveTexture(glad.GL_TEXTURE0);
+        glad.glBindTexture(glad.GL_TEXTURE_2D, @bitCast(self.scale_curve_tex.id));
+
         rl.rlBindShaderBuffer(self.ssbo, 0);
         const cnt: i32 = @intFromFloat(@ceil(@as(f32, @floatFromInt(self.particles.len)) / 64.0));
         rl.rlComputeShaderDispatch(@intCast(cnt), 1, 1);
@@ -145,11 +159,16 @@ pub const ParticleSystem = struct {
         glad.glDrawArraysInstanced(glad.GL_TRIANGLES, 0, 6, self.amount);
         rl.rlDisableVertexArray();
         rl.rlDisableShader();
+
+        rl.DrawTexture(self.scale_curve_tex, 100, 100, rl.WHITE);
     }
 
     // TODO(calco): SHOULD NOT have to pass an allocator to this lmfao
     pub fn deinit(self: *ParticleSystem, deallocator: std.mem.Allocator) void {
         deallocator.free(self.particles);
+
+        rl.UnloadTexture(self.scale_curve_tex);
+
         rl.rlUnloadShaderProgram(self.compute);
         rl.rlUnloadShaderBuffer(self.ssbo);
         rl.UnloadShader(self.shader);

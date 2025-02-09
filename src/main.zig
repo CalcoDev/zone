@@ -153,7 +153,8 @@ pub fn imguiMain() !void {
 
     var resource_manager = resources.ResourceManager.create(std.heap.page_allocator);
 
-    _ = resource_manager.loadResource("player_tex", resources.ResourceType.texture, "res/player.png");
+    var d = {};
+    _ = resource_manager.loadResource("scale_curve", .texture, "res/curves/curve.png", @ptrCast(&d));
 
     var ps = particles.ParticleSystem{
         .position = calc.v2f.zero(),
@@ -178,19 +179,11 @@ pub fn imguiMain() !void {
             .angle_min = 0.0,
             .angle_max = std.math.pi / 2.0,
         },
-        .animated_velocity = undefined,
-        .display = undefined,
 
-        .particles = undefined,
-        .compute = undefined,
-        .ssbo = undefined,
-        .shader = undefined,
-        .vao = undefined,
-        .vbo = undefined,
-        .dbg_tex = undefined,
-        .scale_curve_tex = undefined,
+        .animated_velocity = .{},
+        .display = .{},
     };
-    ps.init(std.heap.page_allocator);
+    // ps.init(&resource_manager, std.heap.page_allocator);
 
     var editor = curveEditor.createCurveEditor(std.heap.page_allocator);
     editor.init();
@@ -270,18 +263,6 @@ pub fn imguiMain() !void {
 
         rl.BeginDrawing();
         rl.BeginMode3D(camera);
-
-        // TODO(calco): All things should probably tick at the same time and draw later but meh :skull:
-        if (editor.data.baked) {
-            rl.UnloadTexture(ps.scale_curve_tex);
-            const real_path = rl.TextFormat("res/curves/%s", @as([*c]u8, @ptrCast(@constCast(&editor.data.filename))));
-            rl.rlTextureParameters(ps.scale_curve_tex.id, rl.RL_TEXTURE_MAG_FILTER, glad.GL_LINEAR);
-            rl.rlTextureParameters(ps.scale_curve_tex.id, rl.RL_TEXTURE_MIN_FILTER, glad.GL_LINEAR);
-            ps.scale_curve_tex = rl.LoadTexture(real_path);
-        }
-
-        const data = resource_manager.getResourceData(resources.TextureData, "player_tex");
-        rl.DrawTextureEx(data.texture, @bitCast(calc.v2f.init(120, 120)), 0, 3.0, rl.WHITE);
 
         ps.tick();
         ps.draw();

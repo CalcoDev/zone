@@ -7,6 +7,8 @@ const cimgui = @import("../libs/cimgui.zig");
 const calc = @import("../calc.zig");
 const curves = @import("../curves.zig");
 
+const resources = @import("../resources.zig");
+
 pub const Particle = packed struct {
     position: calc.v2f,
     velocity: calc.v2f,
@@ -34,6 +36,9 @@ pub const EmissionShape = union(EmissionShapeTag) {
     circle: struct { radius: f32 },
     ring: struct { inner_radius: f32, outer_radius: f32 },
 };
+
+const psDefaultComputeShader = "ps_def_shader";
+const psDefaultGraphicsShader = "ps_def_graphics";
 
 pub const ParticleSystem = struct {
     // TODO(calco): These should become like components or sth yknow
@@ -69,29 +74,25 @@ pub const ParticleSystem = struct {
     display: struct {},
 
     // Private Stuff
-    particles: []Particle,
-    compute: c_uint, // raylib compute shader.
-    ssbo: c_uint,
+    particles: []Particle = undefined,
+    ssbo: c_uint = undefined,
 
-    shader: rl.Shader,
-    vao: c_uint,
-    vbo: c_uint,
+    vao: c_uint = undefined,
+    vbo: c_uint = undefined,
 
-    dbg_tex: rl.Texture,
+    dbg_tex: rl.Texture = undefined,
 
-    scale_curve_tex: rl.Texture,
+    rm: *resources.ResourceManager = undefined,
 
-    pub fn init(self: *ParticleSystem, allocator: std.mem.Allocator) void {
-        self.scale_curve_tex = rl.LoadTexture("res/curves/sample2.png");
-        rl.rlTextureParameters(self.scale_curve_tex.id, rl.RL_TEXTURE_MAG_FILTER, glad.GL_LINEAR);
-        rl.rlTextureParameters(self.scale_curve_tex.id, rl.RL_TEXTURE_MIN_FILTER, glad.GL_LINEAR);
-
+    pub fn init(self: *ParticleSystem, rm: *resources.ResourceManager, allocator: std.mem.Allocator) void {
+        self.rm = rm;
         self.particles = allocator.alloc(Particle, @intCast(self.amount)) catch unreachable;
 
-        const compute_data = rl.LoadFileText("res/shaders/particles/simulate.glsl");
-        const compute_shader = rl.rlCompileShader(compute_data, rl.RL_COMPUTE_SHADER);
-        self.compute = rl.rlLoadComputeShaderProgram(compute_shader);
-        rl.UnloadFileText(compute_data);
+        _ = rm.loadResource(psDefaultComputeShader, .shader, "res/shaders/particles/simulate.glsl", @ptrCast(@constCast(&.{
+            .vertex = false,
+            .fragment = false,
+            .compute = true,
+        })));
 
         self.ssbo = rl.rlLoadShaderBuffer(@as(u32, @intCast(self.particles.len)) * @sizeOf(Particle), self.particles.ptr, rl.RL_DYNAMIC_COPY);
 
@@ -105,7 +106,11 @@ pub const ParticleSystem = struct {
             50.0, 0.0,  0.0, 1.0, 0.0,
         };
 
-        self.shader = rl.LoadShader("res/shaders/particles/particles.vert", "res/shaders/particles/particles.frag");
+        _ = rm.loadResource(psDefaultGraphicsShader, .shader, "res/shaders/particles/particles", @ptrCast(@constCast(&.{
+            .vertex = true,
+            .fragment = true,
+            .compute = false,
+        })));
 
         self.vao = rl.rlLoadVertexArray();
         _ = rl.rlEnableVertexArray(self.vao);
@@ -125,25 +130,27 @@ pub const ParticleSystem = struct {
     }
 
     pub fn tick(self: *ParticleSystem) void {
-        rl.rlEnableShader(self.compute);
-        rl.rlSetUniform(0, &rl.GetFrameTime(), rl.SHADER_UNIFORM_FLOAT, 1);
+        const null_tex = self.rm.getResource("scale_curve");
+        if (null_tex) |tex| {
+            const data = tex.getData(resources.TextureData);
 
-        // rl.rlActiveTextureSlot(0);
-        // rl.rlEnableTexture(self.scale_curve_tex.id);
-        // const loc = glad.glGetUniformLocation(self.compute, "u_scale_tex");
-        glad.glUniform1i(1, 0);
-        glad.glActiveTexture(glad.GL_TEXTURE0);
-        glad.glBindTexture(glad.GL_TEXTURE_2D, @bitCast(self.scale_curve_tex.id));
+            rl.rlEnableShader(self.rm.getResource(psDefaultComputeShader).?.getData(resources.ShaderData).*.shader_id);
+            rl.rlSetUniform(0, &rl.GetFrameTime(), rl.SHADER_UNIFORM_FLOAT, 1);
 
-        rl.rlBindShaderBuffer(self.ssbo, 0);
-        const cnt: i32 = @intFromFloat(@ceil(@as(f32, @floatFromInt(self.particles.len)) / 64.0));
-        rl.rlComputeShaderDispatch(@intCast(cnt), 1, 1);
-        rl.rlDisableShader();
+            glad.glUniform1i(1, 0);
+            glad.glActiveTexture(glad.GL_TEXTURE0);
+            glad.glBindTexture(glad.GL_TEXTURE_2D, data.texture.id);
+
+            rl.rlBindShaderBuffer(self.ssbo, 0);
+            const cnt: i32 = @intFromFloat(@ceil(@as(f32, @floatFromInt(self.particles.len)) / 64.0));
+            rl.rlComputeShaderDispatch(@intCast(cnt), 1, 1);
+            rl.rlDisableShader();
+        }
     }
 
     pub fn draw(self: *ParticleSystem) void {
         rl.rlDrawRenderBatchActive();
-        rl.rlEnableShader(self.shader.id);
+        rl.rlEnableShader(self.rm.getResource(psDefaultGraphicsShader).?.getData(resources.ShaderData).*.shader_id);
         rl.rlBindShaderBuffer(self.ssbo, 0);
         const model_view_projection = rl.MatrixMultiply(rl.rlGetMatrixModelview(), rl.rlGetMatrixProjection());
         rl.rlSetUniformMatrix(0, model_view_projection);
@@ -159,8 +166,6 @@ pub const ParticleSystem = struct {
         glad.glDrawArraysInstanced(glad.GL_TRIANGLES, 0, 6, self.amount);
         rl.rlDisableVertexArray();
         rl.rlDisableShader();
-
-        rl.DrawTexture(self.scale_curve_tex, 100, 100, rl.WHITE);
     }
 
     // TODO(calco): SHOULD NOT have to pass an allocator to this lmfao
@@ -169,9 +174,9 @@ pub const ParticleSystem = struct {
 
         rl.UnloadTexture(self.scale_curve_tex);
 
-        rl.rlUnloadShaderProgram(self.compute);
+        // TODO(calco): release the 2 particle things. ref cnt useful here
+
         rl.rlUnloadShaderBuffer(self.ssbo);
-        rl.UnloadShader(self.shader);
         rl.rlUnloadVertexArray(self.vao);
         rl.rlUnloadVertexBuffer(self.vbo);
 

@@ -284,6 +284,102 @@ pub fn imguiMain() !void {
     rl.CloseWindow();
 }
 
+const ecs = @import("ecs/ecs.zig");
+
+pub fn ecsMain() !void {
+    rl.SetTraceLogLevel(rl.LOG_WARNING);
+
+    rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
+    rl.SetTargetFPS(gameState.gameFps);
+
+    var world = ecs.World.init(std.heap.page_allocator);
+
+    var camera = rl.Camera3D{
+        .projection = rl.CAMERA_ORTHOGRAPHIC,
+        .fovy = 1280.0 / 2.0,
+        .position = rl.Vector3{ .x = 0.0, .y = 0.0, .z = -10.0 },
+        .target = rl.Vector3{ .x = 0.0, .y = 0.0, .z = 0.0 },
+        .up = rl.Vector3{ .x = 0.0, .y = -1.0, .z = 0.0 },
+    };
+
+    const monitor = glfw.glfwGetPrimaryMonitor();
+    var x_scale: f32 = 0.0;
+    var y_scale: f32 = 0.0;
+    glfw.glfwGetMonitorContentScale(monitor, &x_scale, &y_scale);
+
+    const imgui_context = cimgui.igCreateContext(null);
+    const io = cimgui.igGetIO();
+    io.*.ConfigFlags |= cimgui.ImGuiConfigFlags_ViewportsEnable;
+
+    const style = cimgui.igGetStyle();
+    cimgui.igStyleColorsDark(style);
+    cimgui.ImGuiStyle_ScaleAllSizes(style, x_scale);
+    style.*.WindowRounding = 0.0;
+    style.*.Colors[cimgui.ImGuiCol_WindowBg].w = 1.0;
+
+    _ = cimgui.ImGui_ImplGlfw_InitForOpenGL(@ptrCast(rl.CALCO_getGlfwContext()), true);
+    _ = cimgui.ImGui_ImplOpenGL3_Init("#version 130");
+
+    const fonts = io.*.Fonts;
+    const iosevka_font = cimgui.ImFontAtlas_AddFontFromFileTTF(
+        fonts,
+        "res/fonts/iosevka_term.ttf",
+        @round(16.0 * x_scale),
+        null,
+        cimgui.ImFontAtlas_GetGlyphRangesDefault(fonts),
+    );
+
+    while (!rl.WindowShouldClose()) {
+        const movement = calc.v2i.init(
+            @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_D))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_A))),
+            @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_S))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_W))),
+        );
+        const vel = movement.to_f32().normalize().scale(gameState.playerSpeed * 4.0);
+        camera.position.x = camera.position.x + vel.x;
+        camera.position.y = camera.position.y + vel.y;
+        camera.target.x = camera.position.x;
+        camera.target.y = camera.position.y;
+
+        cimgui.ImGui_ImplOpenGL3_NewFrame();
+        cimgui.ImGui_ImplGlfw_NewFrame();
+        cimgui.igNewFrame();
+
+        cimgui.igPushFont(iosevka_font);
+        // draw imgui stuff maybe
+        cimgui.igPopFont();
+        cimgui.igRender();
+
+        rl.rlViewport(0, 0, gameState.winWidth, gameState.winHeight);
+        rl.rlClearColor(0, 0, 0, 255);
+        rl.rlClearScreenBuffers();
+
+        cimgui.ImGui_ImplOpenGL3_RenderDrawData(cimgui.igGetDrawData());
+
+        const backup_context = rl.CALCO_getGlfwContext();
+        cimgui.igUpdatePlatformWindows();
+        cimgui.igRenderPlatformWindowsDefault(null, null);
+        rl.CALCO_setGlfwContext(backup_context);
+
+        rl.BeginDrawing();
+        rl.BeginMode3D(camera);
+        // draw raylib camera stuff
+        rl.EndMode3D();
+        rl.DrawFPS(20, gameState.winHeight - 20);
+        // draw raylib non cam-camera stuff
+
+        rl.EndDrawing();
+    }
+
+    world.deinit();
+
+    cimgui.ImGui_ImplOpenGL3_Shutdown();
+    cimgui.ImGui_ImplGlfw_Shutdown();
+    cimgui.igDestroyContext(imgui_context);
+
+    rl.CloseWindow();
+}
+
 pub fn main() !void {
-    try imguiMain();
+    // try imguiMain();
+    try ecsMain();
 }

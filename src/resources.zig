@@ -14,7 +14,6 @@ pub const Resource = struct {
     path: []const u8,
     type: ResourceType,
     data: *anyopaque,
-    ref_count: i32,
 
     pub fn create(name: []const u8, path: []const u8, @"type": ResourceType, data: *anyopaque) Resource {
         return .{
@@ -22,7 +21,6 @@ pub const Resource = struct {
             .path = path,
             .type = @"type",
             .data = data,
-            .ref_count = 0,
         };
     }
 
@@ -44,58 +42,52 @@ pub const ResourceManager = struct {
         };
     }
 
-    pub fn loadResource(self: *ResourceManager, name: []const u8, @"type": ResourceType, path: []const u8, comptime ref: bool) *Resource {
-        const init_res = self.resources.getPtr(name);
-        if (init_res != null) {
-            if (ref) {
-                init_res.?.ref_count += 1;
-            }
-            return init_res.?;
-        }
-        std.log.debug("Loaded resource [{s}] with name [{s}]", .{ path, name });
-        var resource = getResourceFunc(@"type").load(self, path);
-        resource.name = name;
-        if (ref) {
-            resource.ref_count += 1;
-        }
-        self.resources.put(name, resource) catch unreachable;
-        return &resource;
-    }
-
-    pub fn getResource(self: *ResourceManager, name: []const u8, comptime ref: bool) ?*Resource {
-        const res = self.resources.getPtr(name);
-        if (res != null and ref) {
-            res.?.ref_count += 1;
-        }
-        return res;
-    }
-
-    pub fn getResourceData(self: *ResourceManager, comptime TData: type, name: []const u8, comptime ref: bool) *TData {
-        return self.getResource(name, ref).?.getData(TData);
-    }
-
-    pub fn releaseResource(self: *ResourceManager, resource: *Resource, comptime ref: bool) void {
-        resource.ref_count -= 1;
-        std.log.debug("Released resource [{s} {s}] (ref_cnt: {}).", .{ resource.name, resource.path, resource.ref_count });
-        if (ref and resource.ref_count <= 0) {
-            _ = self.resources.remove(resource.name);
-            getResourceFunc(resource.type).deinit(self, resource);
-            std.log.debug("Deinit resource [{s} {s}].", .{ resource.name, resource.path });
+    pub fn reloadResources(self: *ResourceManager) void {
+        var iter = self.resources.valueIterator();
+        while (iter.next()) |resource| {
+            const resource_cpy = resource.*;
+            self.internal_unloadResource(resource);
+            _ = self.loadResource(resource_cpy.name, resource_cpy.type, resource_cpy.path);
         }
     }
 
-    // TODO(calco): Lmfao, should notify ppl that resources have been released!
+    pub fn loadResource(self: *ResourceManager, name: []const u8, @"type": ResourceType, path: []const u8) *Resource {
+        return self.resources.getPtr(name) orelse self.internal_loadResource(name, @"type", path);
+    }
+
+    pub fn getResource(self: *ResourceManager, name: []const u8) ?*Resource {
+        return self.resources.getPtr(name);
+    }
+
+    pub fn getResourceData(self: *ResourceManager, comptime TData: type, name: []const u8) *TData {
+        return self.getResource(name).?.getData(TData);
+    }
+
+    pub fn releaseResource(self: *ResourceManager, resource: *Resource) void {
+        self.internal_unloadResource(resource);
+    }
+
     pub fn deinit(self: *ResourceManager) void {
         std.log.debug("Deinit Resource Manager.", .{});
         var iter = self.resources.valueIterator();
         while (iter.next()) |resource| {
-            if (resource.ref_count > 0) {
-                std.log.warn("Ayo, you are freeing resources that are still referenced! ({s} {s})", .{ resource.name, resource.path });
-            }
-            getResourceFunc(resource.type).deinit(self, resource);
-            std.log.debug("Deinit resource [{s} {s}].", .{ resource.name, resource.path });
+            self.internal_unloadResource(resource);
         }
         self.resources.deinit();
+    }
+
+    fn internal_loadResource(self: *ResourceManager, name: []const u8, @"type": ResourceType, path: []const u8) *Resource {
+        var resource = getResourceFunc(@"type").load(self, path);
+        resource.name = name;
+        self.resources.put(name, resource) catch unreachable;
+        std.log.debug("Loaded {s} resource [\"{s}\" \"{s}\"].", .{ @tagName(resource.type), resource.name, resource.path });
+        return self.resources.getPtr(name).?;
+    }
+
+    fn internal_unloadResource(self: *ResourceManager, resource: *Resource) void {
+        std.log.debug("Unloaded {s} resource [\"{s}\" \"{s}\"].", .{ @tagName(resource.type), resource.name, resource.path });
+        getResourceFunc(resource.type).deinit(self, resource);
+        _ = self.resources.remove(resource.name);
     }
 };
 
@@ -111,8 +103,8 @@ fn loadTexture(rm: *ResourceManager, path: []const u8) Resource {
     return Resource.create("", path, ResourceType.texture, data);
 }
 
-fn deinitTexture(rm: *ResourceManager, self: *Resource) void {
-    const data = self.getData(TextureData);
+fn deinitTexture(rm: *ResourceManager, resource: *Resource) void {
+    const data = resource.getData(TextureData);
     rl.UnloadTexture(data.texture);
     rm.allocator.destroy(data);
 }
@@ -120,20 +112,13 @@ fn deinitTexture(rm: *ResourceManager, self: *Resource) void {
 // Assoc array stuff
 pub const ResourceFunc = struct {
     load: *const fn (rm: *ResourceManager, path: []const u8) Resource,
-    deinit: *const fn (rm: *ResourceManager, self: *Resource) void,
+    deinit: *const fn (rm: *ResourceManager, resource: *Resource) void,
 };
 const resourceFuncs = makeAssocArray(ResourceType, ResourceFunc, @intFromEnum(ResourceType.max), &.{
     .{ .key = ResourceType.texture, .value = .{ .load = &loadTexture, .deinit = &deinitTexture } },
 });
 fn getResourceFunc(@"type": ResourceType) ResourceFunc {
     return resourceFuncs[@intFromEnum(@"type")];
-}
-
-const resourceDatatypes = makeAssocArray(ResourceType, type, @intFromEnum(ResourceType.max), &.{
-    .{ .key = ResourceType.texture, .value = TextureData },
-});
-fn getResourceDatatype(comptime @"type": ResourceType) ResourceFunc {
-    return resourceDatatypes[@intFromEnum(@"type")];
 }
 
 fn AssocArrayPair(comptime TKey: type, comptime TValue: type) type {

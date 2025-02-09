@@ -153,7 +153,7 @@ pub fn imguiMain() !void {
 
     var resource_manager = resources.ResourceManager.create(std.heap.page_allocator);
 
-    _ = resource_manager.loadResource("player_tex", resources.ResourceType.texture, "res/player.png", true);
+    _ = resource_manager.loadResource("player_tex", resources.ResourceType.texture, "res/player.png");
 
     var ps = particles.ParticleSystem{
         .position = calc.v2f.zero(),
@@ -233,6 +233,10 @@ pub fn imguiMain() !void {
     editor.data.axisLabelFontsize *= x_scale;
 
     while (!rl.WindowShouldClose()) {
+        if (rl.IsKeyPressed(rl.KEY_F5)) {
+            resource_manager.reloadResources();
+        }
+
         const movement = calc.v2i.init(
             @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_D))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_A))),
             @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_S))) - @as(i32, @intFromBool(rl.IsKeyDown(rl.KEY_W))),
@@ -276,9 +280,8 @@ pub fn imguiMain() !void {
             ps.scale_curve_tex = rl.LoadTexture(real_path);
         }
 
-        const data = resource_manager.getResource("player_tex", false).?;
-        std.log.debug("player_tex: {}", .{data.ref_count});
-        rl.DrawTexture(data.getData(resources.TextureData).texture, 120, 120, rl.WHITE);
+        const data = resource_manager.getResourceData(resources.TextureData, "player_tex");
+        rl.DrawTextureEx(data.texture, @bitCast(calc.v2f.init(120, 120)), 0, 3.0, rl.WHITE);
 
         ps.tick();
         ps.draw();

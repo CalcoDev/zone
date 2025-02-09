@@ -15,6 +15,8 @@ const curveEditor = @import("editor/curve_editor.zig");
 const particles = @import("particles/particles.zig");
 const particlesEditor = @import("particles/particles_editor.zig");
 
+const resources = @import("resources.zig");
+
 var game: gameState.State = undefined;
 
 pub fn gameMain() !void {
@@ -144,8 +146,14 @@ pub fn gameMain() !void {
 }
 
 pub fn imguiMain() !void {
+    rl.SetTraceLogLevel(rl.LOG_WARNING);
+
     rl.InitWindow(gameState.winWidth, gameState.winHeight, gameState.winTitle);
     rl.SetTargetFPS(gameState.gameFps);
+
+    var resource_manager = resources.ResourceManager.create(std.heap.page_allocator);
+
+    _ = resource_manager.loadResource("player_tex", resources.ResourceType.texture, "res/player.png", true);
 
     var ps = particles.ParticleSystem{
         .position = calc.v2f.zero(),
@@ -267,6 +275,11 @@ pub fn imguiMain() !void {
             rl.rlTextureParameters(ps.scale_curve_tex.id, rl.RL_TEXTURE_MIN_FILTER, glad.GL_LINEAR);
             ps.scale_curve_tex = rl.LoadTexture(real_path);
         }
+
+        const data = resource_manager.getResource("player_tex", false).?;
+        std.log.debug("player_tex: {}", .{data.ref_count});
+        rl.DrawTexture(data.getData(resources.TextureData).texture, 120, 120, rl.WHITE);
+
         ps.tick();
         ps.draw();
 
@@ -275,6 +288,8 @@ pub fn imguiMain() !void {
 
         rl.EndDrawing();
     }
+
+    resource_manager.deinit();
 
     editor.deinit();
 

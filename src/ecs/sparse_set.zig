@@ -4,12 +4,12 @@ pub fn SparseSet(comptime T: type) type {
     return struct {
         const Self = @This();
 
-        entities: std.AutoHashMap(u32, usize),
+        entities: std.AutoArrayHashMap(u32, usize),
         data: std.ArrayList(T),
 
         pub fn init(allocator: std.mem.Allocator) Self {
             return Self{
-                .entities = std.AutoHashMap(u32, usize).init(allocator),
+                .entities = std.AutoArrayHashMap(u32, usize).init(allocator),
                 .data = std.ArrayList(T).init(allocator),
             };
         }
@@ -17,6 +17,10 @@ pub fn SparseSet(comptime T: type) type {
         pub fn deinit(self: *Self) void {
             self.entities.deinit();
             self.data.deinit();
+        }
+
+        pub fn length(self: *Self) usize {
+            return self.data.items.len;
         }
 
         pub fn add(self: *Self, entity: u32, component: T) !void {
